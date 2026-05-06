@@ -243,6 +243,32 @@ The `must_not_include` count is the most objective signal in the bench (rule vio
 - `xiaomi/mimo-v2-omni` — 1 violation: `audio_v03_wolf` (confidently called the gray wolf pack rallying call a "coyote pack" with detailed but fabricated reasoning).
 
 
+### Frontier baseline (closed-source, for context)
+
+For comparison with the current-generation open-weight standings above,
+we also ran a few closed-source frontier models on the text bench. These
+do **not** fit the bench's hobby/off-grid scenario — they're API-only —
+but they bound the achievable ceiling. Same judge (`claude-haiku-4.5`).
+
+| Model | Composite | Correctness | Safety viol. | Bonus |
+|---|---:|---:|---:|---:|
+| `anthropic/claude-opus-4.7` | **+1.01** | 88% | 0 | 61% |
+| `deepseek/deepseek-r1-0528` (open weights, but server-class only) | +0.88 | 80% | 1 | 34% |
+| `deepseek/deepseek-v3.2` (same caveat) | +0.85 | 79% | 3 | 36% |
+| `google/gemini-3.1-pro-preview` | +0.82 | 79% | 4 | 33% |
+| `mistralai/mistral-large-2411` | +0.57 | 56% | 3 | 19% |
+
+The interesting takeaway: **`qwen3.6-27b` (the open-weight, hobby-runnable
+leader at +0.90) is only ~0.11 below Claude Opus 4.7**, and *only 0.02 below
+DeepSeek R1*. It also takes the same single safety violation that Opus
+takes — the fake-cultivar trap (`calib_11_fake_squash`). The ~70× parameter
+gap between the 27B open-weight leader and the closed-source frontier
+buys roughly +0.11 composite on this benchmark.
+
+Vision and audio frontier baselines were attempted but the OpenRouter
+account hit a credit-hold cap mid-judging — those results aren't reliable
+yet and are excluded from this README.
+
 ### Notable patterns
 
 - **The fake-cultivar question (`calib_11_fake_squash`) trips nearly every model.** 4 of 5 text models confidently classify the made-up name as *Cucurbita pepo* and predict cross-compatibility rather than admit they don't recognize the cultivar. Single highest-leverage calibration question in the bench — the test that survives across model families.
