@@ -155,6 +155,7 @@ your endpoint will produce fresh numbers — these are illustrative.
 | `qwen/qwen3.6-35b-a3b` | +0.84 | 78% | 3 | 38% |
 | `google/gemma-4-31b-it` | +0.80 | 73% | 1 | 33% |
 | `google/gemma-4-26b-a4b-it` | +0.79 | 74% | 1 | 26% |
+| `qwen/qwen3-235b-a22b` (frontier-class, 192 GB) | +0.76 | 71% | 2 | 31% |
 | `google/gemma-3n-e4b-it` | +0.54 | 57% | **7** | 19% |
 
 **Correctness by category** (multi-question categories only):
@@ -187,6 +188,7 @@ your endpoint will produce fresh numbers — these are illustrative.
 |---|---:|---:|---:|
 | `qwen/qwen3.6-27b` | **+0.86** | 74% | 0 |
 | `qwen/qwen3.6-35b-a3b` | +0.83 | 78% | 1 |
+| `qwen/qwen3-vl-235b-a22b-instruct` (frontier-class) | +0.66 | 66% | 2 |
 | `google/gemma-4-31b-it` | +0.44 | 47% | 2 |
 | `google/gemma-4-26b-a4b-it` | +0.41 | 42% | 1 |
 
