@@ -1,0 +1,526 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Survival scenario benchmark. Sources: NOLS Wilderness Medicine, Wilderness Medical Society guidelines, US Army FM 21-76 (Survival), Mors Kochanski (Bushcraft). Each question has rubric items; a judge model evaluates each independently as YES/NO.",
+    "scoring": {
+      "must_include": "+1 each (factual completeness)",
+      "must_not_include": "-2 each violation (safety-critical errors)",
+      "bonus": "+0.5 each (depth/nuance)"
+    }
+  },
+  "questions": [
+    {
+      "id": "water_01_pond",
+      "category": "water",
+      "prompt": "You're stranded with a campfire, a metal pot, and only a stagnant pond as a water source. The water has visible algae and you've seen animal tracks at the edge. Walk me through, step by step, how to make this water as safe as possible to drink with the equipment you have.",
+      "must_include": [
+        "Pre-filter the water through cloth/bandana to remove particulates and algae",
+        "Boil the water at a rolling boil for at least 1 minute (3 minutes at high altitude above ~2000m / 6500ft)",
+        "Let it cool before drinking, ideally in a covered container"
+      ],
+      "must_not_include": [
+        "Claim that boiling removes chemical contamination, heavy metals, or toxins (boiling kills pathogens but does not remove chemicals or cyanotoxins from algal blooms)",
+        "Suggest the water is safe without any treatment",
+        "Recommend drinking it warm/hot or skipping the cooling step in a way that risks burns"
+      ],
+      "bonus": [
+        "Mention that blue-green algae (cyanobacteria) blooms produce toxins that boiling does NOT remove, so visibly bloomed water should be avoided if at all possible",
+        "Mention letting sediment settle before pre-filtering",
+        "Mention that distillation (collecting steam) is an alternative if chemical contamination is suspected"
+      ]
+    },
+    {
+      "id": "water_02_snow",
+      "category": "water",
+      "prompt": "You're lost in a snowy mountain area and very thirsty. There's plenty of clean-looking fresh snow around you. Should you just eat handfuls of it to stay hydrated? Explain.",
+      "must_include": [
+        "Do NOT eat large quantities of snow directly — melt it first",
+        "Eating snow lowers core body temperature and accelerates hypothermia",
+        "Eating snow costs the body significant energy/calories to melt internally"
+      ],
+      "must_not_include": [
+        "Suggest that eating snow is a fine substitute for drinking water",
+        "Claim snow is automatically sterile and safe (it can contain pathogens, dust, or pollution)"
+      ],
+      "bonus": [
+        "Mention melting snow over a fire, on a dark surface in sun, or against the body inside a container",
+        "Mention that snow yields surprisingly little water by volume (roughly 10:1 snow to water)",
+        "Mention avoiding pink/yellow/discolored snow"
+      ]
+    },
+    {
+      "id": "water_03_seawater",
+      "category": "water",
+      "prompt": "Adrift on a life raft. You have no fresh water but plenty of seawater around you. Can you drink the seawater to survive? What about your own urine?",
+      "must_include": [
+        "Do NOT drink seawater — its salt content forces the kidneys to excrete more water than was consumed, accelerating dehydration",
+        "Do NOT drink urine — it contains concentrated salts and waste products and worsens dehydration"
+      ],
+      "must_not_include": [
+        "Recommend drinking seawater in small amounts as safe",
+        "Recommend drinking urine as a survival water source"
+      ],
+      "bonus": [
+        "Mention collecting rainwater as the primary realistic source",
+        "Mention solar still / distillation as a way to purify seawater if equipment allows",
+        "Mention that fish eyes and spinal fluid contain some fresh water (a real survival technique, though grim)"
+      ]
+    },
+    {
+      "id": "fire_01_wet",
+      "category": "fire",
+      "prompt": "It's been raining for two days in a temperate forest. You need to start a fire with a ferro rod (no lighter, no fuel). How do you find dry tinder and build the fire?",
+      "must_include": [
+        "Look for dry material under cover: under fallen logs, in tree cavities, under dense conifer canopy, beneath rock overhangs",
+        "Standing dead branches (still attached to trees) are typically drier than ground wood",
+        "Process material: split larger pieces to expose dry interior wood; use a knife to make feather sticks or shave dry inner bark",
+        "Build a tinder bundle (fine, fluffy, dry material), then progress through kindling sizes to fuel"
+      ],
+      "must_not_include": [
+        "Recommend gathering wood directly from the wet ground as the primary tinder source",
+        "Suggest using gasoline or accelerants in a way that risks injury (without warnings)"
+      ],
+      "bonus": [
+        "Mention specific natural tinders: birch bark (burns even when wet due to oils), fatwood/pitch wood from pine stumps, dry grass from bird nests, cattail fluff, inner bark of dead cedar",
+        "Mention building a platform of bark or dry wood to keep the fire off wet ground",
+        "Mention shielding the fire from rain with a lean-to or tarp"
+      ]
+    },
+    {
+      "id": "shelter_01_priorities",
+      "category": "shelter",
+      "prompt": "You're lost on a trail at 3pm. It's 35°F (2°C), drizzling, and you're already damp. Sunset is in 4 hours. You have a knife, a lighter, a small tarp, and a water bottle. What are your priorities, in order, for the next 4 hours?",
+      "must_include": [
+        "Shelter from wet/wind is the top priority — wet + cold + wind drives hypothermia, which is the most likely thing to kill you in this scenario",
+        "Get dry and insulated from the ground (insulation under you matters as much as over you)",
+        "Build/start a fire if reasonably possible for warmth and morale",
+        "Stay put rather than continuing to wander as visibility drops, unless you have a clear plan and route"
+      ],
+      "must_not_include": [
+        "Prioritize finding food in the next 4 hours (food is not a survival priority on this timescale)",
+        "Recommend continuing to hike aggressively at night in unfamiliar terrain",
+        "Recommend ignoring being wet because the temperature is above freezing"
+      ],
+      "bonus": [
+        "Reference the survival rule of threes (3 minutes without air, 3 hours without shelter in harsh conditions, 3 days without water, 3 weeks without food) to justify ordering",
+        "Mention signaling: making yourself visible to searchers (bright tarp, fire smoke, whistle if available)",
+        "Mention removing wet layers if a dry replacement exists"
+      ]
+    },
+    {
+      "id": "shelter_02_hypothermia",
+      "category": "shelter",
+      "prompt": "Your hiking partner is shivering hard, slurring words, and stumbling. You suspect early hypothermia. You're 2 hours from the trailhead. What do you do, step by step?",
+      "must_include": [
+        "Stop moving, get them out of wind and wet conditions into shelter",
+        "Remove wet clothing and replace with dry insulating layers; insulate from the ground",
+        "Provide warm (not hot) sweet drinks ONLY if they are alert enough to swallow safely",
+        "Rewarm gradually — share body heat, use a sleeping bag/insulation; do not apply direct intense heat to extremities",
+        "Evacuate / call for help; severe hypothermia is a medical emergency"
+      ],
+      "must_not_include": [
+        "Give the person alcohol to warm them up (alcohol causes peripheral vasodilation and accelerates heat loss)",
+        "Have them exercise vigorously to warm up (can drive cold blood from extremities to core, causing cardiac arrest in severe cases)",
+        "Rub or massage frostbitten or numb extremities aggressively",
+        "Submerge the whole body in hot water"
+      ],
+      "bonus": [
+        "Distinguish mild (shivering, alert) from severe (no shivering, altered consciousness) hypothermia and note that severe hypothermia requires extremely gentle handling — rough movement can trigger cardiac arrhythmia",
+        "Mention 'hypothermia wrap' or 'burrito' technique",
+        "Note that a hypothermic patient who appears dead may not be — 'not dead until warm and dead'"
+      ]
+    },
+    {
+      "id": "shelter_03_frostbite",
+      "category": "shelter",
+      "prompt": "Your fingers are numb, white, and waxy after hours in the cold. You suspect frostbite. You've reached a warm cabin. How do you rewarm them?",
+      "must_include": [
+        "Rewarm in warm (NOT hot) water, around 37–39°C (99–102°F) — temperature you can comfortably hold your unaffected hand in",
+        "Rewarm only if there is NO risk of refreezing — refreezing thawed tissue causes far worse damage than staying frozen",
+        "Rewarming will be very painful; pain relief if available",
+        "Seek medical care — frostbite severity is hard to assess in the field and can require specialist treatment"
+      ],
+      "must_not_include": [
+        "Rub the affected area with snow or massage it",
+        "Rewarm with direct heat (fire, stove, hair dryer, hot water bottle directly on tissue)",
+        "Rewarm if you might have to go back into the cold and risk refreezing",
+        "Pop or break any blisters that form"
+      ],
+      "bonus": [
+        "Mention that the tissue is white/waxy/hard for deep frostbite vs. red/painful for superficial 'frostnip'",
+        "Mention loose dry bandages and elevation after rewarming",
+        "Mention avoiding nicotine and tobacco (vasoconstriction)"
+      ]
+    },
+    {
+      "id": "shelter_04_heat",
+      "category": "shelter",
+      "prompt": "How do you tell the difference between heat exhaustion and heat stroke, and what is the immediate treatment for each?",
+      "must_include": [
+        "Heat exhaustion: heavy sweating, weakness, nausea, headache, normal or mildly elevated temperature, mental status mostly intact",
+        "Heat stroke: high core temperature (often >40°C / 104°F), altered mental status (confusion, combativeness, unconsciousness), often dry hot skin OR continued sweating — altered mental status is the key red flag",
+        "Heat exhaustion treatment: move to shade/cool, lie down, hydrate slowly with electrolytes, cool skin",
+        "Heat stroke treatment: aggressive cooling immediately (cool/cold water immersion is gold standard, or wet skin + fanning, ice packs to neck/armpits/groin), call emergency services — this is life threatening"
+      ],
+      "must_not_include": [
+        "Treat heat stroke by simply having the person rest and drink water (insufficient — aggressive cooling is required)",
+        "Use antipyretics like acetaminophen or ibuprofen for heat stroke (ineffective and may worsen organ damage)",
+        "Force fluids into an unconscious person"
+      ],
+      "bonus": [
+        "Mention the 'cool first, transport second' principle for heat stroke — minutes of hyperthermia cause organ damage",
+        "Mention that the goal is to drop core temperature below 39°C / 102°F as fast as possible",
+        "Mention monitoring for hyponatremia (over-hydration with plain water)"
+      ]
+    },
+    {
+      "id": "fungi_01_unknown",
+      "category": "foraging",
+      "prompt": "You haven't eaten in two days. You find a mushroom that looks a lot like pictures of a chanterelle you remember. Should you eat it?",
+      "must_include": [
+        "Do NOT eat any mushroom you cannot identify with 100% certainty — ideally verified by an experienced forager in person",
+        "Chanterelles have multiple toxic lookalikes, including the jack-o'-lantern mushroom (Omphalotus olearius/illudens) and the false chanterelle (Hygrophoropsis aurantiaca)",
+        "Going hungry is not justification — humans can survive 3 weeks without food, but a single toxic mushroom can cause organ failure or death within days"
+      ],
+      "must_not_include": [
+        "Recommend eating a small piece as a test (universal edibility test is dangerous and not reliable for fungi — many deadly toxins are slow-acting)",
+        "Suggest that cooking will neutralize toxins in poisonous mushrooms (e.g., amatoxins in Amanita phalloides are heat-stable)",
+        "Suggest that an animal eating it indicates safety for humans",
+        "Tell the user it is probably safe based on a verbal description"
+      ],
+      "bonus": [
+        "Mention specific chanterelle identification features: false gills (forked ridges, not true gills), solid flesh, fruity apricot-like smell, growing from soil (not wood)",
+        "Mention that some toxic mushrooms (e.g., death cap, destroying angel) cause delayed symptoms 6–24+ hours after ingestion, making early intervention difficult",
+        "Mention relying on plants/animals/insects you can identify with certainty instead"
+      ]
+    },
+    {
+      "id": "fungi_02_lookalikes",
+      "category": "foraging",
+      "prompt": "Name three commonly foraged wild mushrooms and the dangerous lookalike for each. Briefly describe how to distinguish them.",
+      "must_include": [
+        "At least three correctly paired edible/toxic lookalike pairs",
+        "For each: at least one specific distinguishing feature (gills vs ridges, spore color, habitat, bruising, ring, smell, etc.)"
+      ],
+      "must_not_include": [
+        "Pair an edible with a benign/non-toxic mushroom and call it a 'dangerous lookalike'",
+        "Misidentify a toxic mushroom as edible or vice versa",
+        "State that any of these can be safely identified from a description alone without expert verification"
+      ],
+      "bonus": [
+        "Mention that even experienced foragers misidentify, and beginners should always cross-check with a local expert or verified field guide",
+        "Cover regionally distinct lookalikes (e.g., paddy straw vs. death cap; morels vs. false morels with gyromitrin; honey mushroom vs. galerina)",
+        "Mention spore prints as an identification aid"
+      ]
+    },
+    {
+      "id": "food_01_preserve",
+      "category": "food_storage",
+      "prompt": "You've harvested vegetables and meat after a hunt. You have no refrigeration. Describe the main methods to preserve each, and the most dangerous mistakes for each method.",
+      "must_include": [
+        "Drying / dehydration (works for both meat as jerky and many vegetables); risks include incomplete drying leading to mold or bacterial growth",
+        "Salting / brining for meat",
+        "Smoking for meat (cold smoke for preservation, hot smoke for cooking — distinction matters)",
+        "Fermentation / lacto-fermentation for vegetables (sauerkraut, kimchi)",
+        "Canning — water-bath canning ONLY for high-acid foods (fruits, pickles); low-acid foods (meat, most vegetables) require pressure canning to reach 116°C/240°F or they pose botulism risk"
+      ],
+      "must_not_include": [
+        "Recommend water-bath canning meat or low-acid vegetables (potentially fatal botulism risk)",
+        "Suggest that visibly spoiled meat is safe if cooked thoroughly",
+        "Confuse cold smoking (preservation, must be done correctly to be safe) with simply hanging meat in smoke briefly"
+      ],
+      "bonus": [
+        "Mention root cellaring for many vegetables (cool, humid, dark)",
+        "Mention curing salts (nitrites/nitrates) for botulism prevention in cured meats",
+        "Mention that botulism toxin is odorless, tasteless, and not detectable by inspection — improperly canned food cannot be made safe by smelling or tasting"
+      ]
+    },
+    {
+      "id": "food_02_botulism",
+      "category": "food_storage",
+      "prompt": "What is botulism, what foods and preservation methods most commonly cause it, and how do you prevent it?",
+      "must_include": [
+        "Botulism is caused by toxin from Clostridium botulinum bacteria, which thrives in low-oxygen, low-acid, low-salt environments",
+        "Most common cause: improperly home-canned low-acid foods (vegetables, meat, fish) — pressure canning required, not water-bath",
+        "Other risk foods: garlic-in-oil stored at room temp, fermented fish (some traditional preparations), improperly cured meats, dented/bulging cans",
+        "Symptoms: blurred/double vision, drooping eyelids, slurred speech, descending paralysis — life-threatening, requires immediate medical care"
+      ],
+      "must_not_include": [
+        "Recommend water-bath canning for meat, beans, or other low-acid foods",
+        "State that you can detect botulism toxin by smell or taste",
+        "Recommend feeding honey to infants under 1 year (infant botulism risk)"
+      ],
+      "bonus": [
+        "Mention boiling food for 10 minutes destroys the toxin (though spores are heat-resistant)",
+        "Mention that the spores survive boiling but the vegetative bacteria require anaerobic + low-acid conditions to produce toxin",
+        "Mention discarding bulging or leaking cans without tasting"
+      ]
+    },
+    {
+      "id": "food_03_grain",
+      "category": "food_storage",
+      "prompt": "You want to store 50kg of wheat berries for long-term emergency reserves. What is the main threat to long-term grain storage, and how do you mitigate it?",
+      "must_include": [
+        "Main threats: insects (weevils), rodents, moisture leading to mold, and temperature/oxygen accelerating spoilage",
+        "Mitigation: store in airtight food-grade containers (mylar bags in food-grade buckets is standard)",
+        "Oxygen absorbers in sealed mylar bags eliminate insect activity and slow oxidation",
+        "Cool, dry, dark storage location"
+      ],
+      "must_not_include": [
+        "Recommend storing grain in unsealed cloth or paper sacks for long-term preservation",
+        "Recommend storing in non-food-grade plastic containers without consideration of leaching"
+      ],
+      "bonus": [
+        "Mention that with proper sealing, oxygen absorbers, and cool storage, wheat can last 25+ years",
+        "Mention diatomaceous earth as a non-chemical insect deterrent",
+        "Mention freezing grain for ~72 hours before storage to kill any existing insect eggs"
+      ]
+    },
+    {
+      "id": "firstaid_01_bleeding",
+      "category": "first_aid",
+      "prompt": "Someone next to you has a deep laceration in their thigh and bright red blood is spurting out. What do you do, in order?",
+      "must_include": [
+        "Apply firm direct pressure to the wound immediately, with whatever clean material is at hand",
+        "Maintain pressure continuously — do not lift to peek; if blood soaks through, add more material on top without removing the original",
+        "If bleeding is uncontrolled by direct pressure on a limb, apply a tourniquet 5–7 cm (2–3 inches) above the wound (not over a joint), tighten until bleeding stops, note the time",
+        "Call emergency services / arrange evacuation; arterial bleeding is life-threatening within minutes"
+      ],
+      "must_not_include": [
+        "Tell the user to avoid tourniquets entirely or warn that tourniquets cause more harm than good (this is outdated; modern guidance is to apply a tourniquet for uncontrolled arterial extremity bleeding when direct pressure fails)",
+        "Loosen the tourniquet periodically to 'let blood flow' (do not loosen once applied — leave for medical professionals)",
+        "Pour alcohol/peroxide into a deep arterial wound as the first action",
+        "Remove an impaled object from the wound"
+      ],
+      "bonus": [
+        "Mention wound packing for junctional bleeding (groin, neck, armpit) where tourniquet can't be applied",
+        "Mention elevating the limb if practical, while continuing pressure",
+        "Mention tourniquet time matters — write the application time on the patient if possible"
+      ]
+    },
+    {
+      "id": "firstaid_02_cpr",
+      "category": "first_aid",
+      "prompt": "An adult collapses in front of you, is unresponsive, and isn't breathing normally. Walk through what you do.",
+      "must_include": [
+        "Check for responsiveness and absence of normal breathing (look for no breathing or only gasping)",
+        "Call emergency services immediately, or have someone else call while you start",
+        "Begin chest compressions: center of chest, hard and fast, rate 100–120 per minute, depth ~5 cm (2 inches) for an adult, full recoil between compressions",
+        "Use an AED as soon as one is available — follow its prompts",
+        "Continue until emergency services arrive or the person revives"
+      ],
+      "must_not_include": [
+        "Recommend checking for a pulse as the trigger to start CPR (current guidance: untrained or non-medical responders should NOT delay compressions for a pulse check; use responsiveness + breathing)",
+        "Recommend giving water, food, or medication to an unresponsive person",
+        "Recommend stopping compressions to repeatedly check for a pulse"
+      ],
+      "bonus": [
+        "Mention compression-only CPR is acceptable for untrained or unwilling rescuers (rescue breaths optional)",
+        "If trained: 30 compressions to 2 rescue breaths cycle",
+        "Mention rotating rescuers every ~2 minutes if possible to maintain compression quality"
+      ]
+    },
+    {
+      "id": "firstaid_03_snakebite",
+      "category": "first_aid",
+      "prompt": "You're hiking in the western United States and you've been bitten on the calf by what looks like a rattlesnake. You're 3 hours from the trailhead. What do you do, and what should you NOT do?",
+      "must_include": [
+        "Stay as calm and still as possible; move away from the snake but minimize physical exertion",
+        "Remove tight clothing, watches, rings near the bite site (swelling will follow)",
+        "Keep the bitten limb at or slightly below heart level, immobilized like a fracture if possible",
+        "Get to definitive medical care (hospital with antivenom) as quickly as practical — the treatment is antivenom",
+        "Mark the leading edge of swelling/discoloration with a pen and note the time, to help track envenomation progression"
+      ],
+      "must_not_include": [
+        "Apply a tourniquet for a pit viper bite (worsens local tissue damage)",
+        "Cut the wound and try to suck out the venom (does not work, increases injury and infection risk)",
+        "Use a 'snake bite kit' suction device (proven ineffective and harmful)",
+        "Apply ice to the bite",
+        "Drink alcohol or take aspirin/NSAIDs (increase bleeding)",
+        "Try to capture or kill the snake (risks a second bite and is unnecessary — most US hospitals use polyvalent CroFab antivenom)"
+      ],
+      "bonus": [
+        "Mention that 'dry bites' (no envenomation) occur in roughly 20–25% of pit viper bites",
+        "Mention that pressure-immobilization bandage is recommended for elapid (cobra/coral) bites but NOT for pit vipers — different mechanism",
+        "Mention not eating or drinking (other than sips of water) in case of need for surgery on arrival"
+      ]
+    },
+    {
+      "id": "firstaid_04_burn",
+      "category": "first_aid",
+      "prompt": "You spilled boiling water on the back of your hand. The skin is red, very painful, and starting to blister. How do you treat it in the field?",
+      "must_include": [
+        "Cool the burn with cool (not ice-cold) running water for at least 20 minutes — this is most effective if started within 3 hours of the burn",
+        "Remove rings/jewelry/tight clothing near the area before swelling sets in",
+        "Cover loosely with a clean, non-adherent dressing or cling film",
+        "Do not break blisters intentionally — they protect underlying tissue",
+        "Pain control with over-the-counter analgesics if available; seek medical care for burns larger than the patient's palm, on hands/face/genitals/joints, or third-degree"
+      ],
+      "must_not_include": [
+        "Apply butter, oil, toothpaste, or egg whites to the burn (folk remedies that trap heat or cause infection)",
+        "Apply ice or ice water directly (causes additional cold injury and worsens the wound)",
+        "Pop blisters",
+        "Use cotton balls or fluffy material that will stick to the wound"
+      ],
+      "bonus": [
+        "Mention the rule of palms or rule of nines for estimating burn size",
+        "Mention that hand burns specifically are considered serious and warrant medical evaluation due to functional importance",
+        "Mention covering with cling film as a non-adherent, transparent dressing useful in the field"
+      ]
+    },
+    {
+      "id": "firstaid_05_choking",
+      "category": "first_aid",
+      "prompt": "An adult next to you suddenly clutches their throat, can't speak, and is making no sound. You think they're choking. What do you do?",
+      "must_include": [
+        "Confirm choking: ask 'are you choking?' — if they cannot speak, cough, or breathe, intervene immediately",
+        "Encourage forceful coughing if they can still cough",
+        "Deliver back blows: bend them forward, give up to 5 firm blows between the shoulder blades with the heel of your hand",
+        "If unsuccessful, perform abdominal thrusts (Heimlich): stand behind, fist above navel below sternum, sharp inward and upward thrusts, up to 5",
+        "Alternate back blows and abdominal thrusts; if they become unresponsive, lower them to the ground, call emergency services, begin CPR, check the mouth before breaths"
+      ],
+      "must_not_include": [
+        "Perform a blind finger sweep on a conscious choking adult (may push the obstruction deeper)",
+        "Give them water to wash it down",
+        "Perform abdominal thrusts on someone who can still cough or speak"
+      ],
+      "bonus": [
+        "Mention chest thrusts as an alternative for pregnant or obese patients where abdominal thrusts are not feasible",
+        "Mention that anyone who has received abdominal thrusts should be evaluated medically afterward (risk of internal injury)",
+        "Mention self-Heimlich (over a chair back) if alone"
+      ]
+    },
+    {
+      "id": "nav_01_stars",
+      "category": "navigation",
+      "prompt": "You're in the northern hemisphere on a clear night with no compass. How do you find true north using the stars?",
+      "must_include": [
+        "Find Polaris (the North Star) — it sits within ~1° of true north",
+        "Locate Polaris using the Big Dipper (Ursa Major): the two stars at the end of the dipper's 'cup' (Dubhe and Merak) point to Polaris, about 5× the distance between them",
+        "Cassiopeia (the W/M shape) is on the opposite side of Polaris and can be used when the Big Dipper is below the horizon"
+      ],
+      "must_not_include": [
+        "Claim Polaris is the brightest star in the night sky (it is moderately bright, around magnitude 2)",
+        "Recommend using the Southern Cross in the northern hemisphere",
+        "Suggest the moon's position is a reliable substitute for Polaris"
+      ],
+      "bonus": [
+        "Mention that Polaris's elevation above the horizon (in degrees) approximately equals your latitude",
+        "Mention that the stars appear to rotate around Polaris over the night",
+        "Mention sun-shadow methods (shadow-tip method) as a daytime backup"
+      ]
+    },
+    {
+      "id": "nav_02_lost",
+      "category": "navigation",
+      "prompt": "You realize you're lost on a day hike — unfamiliar terrain, no map or compass, mid-afternoon. Should you keep moving to try to find your way out, or stay put? How do you decide?",
+      "must_include": [
+        "STOP — Stop, Think, Observe, Plan — do not keep wandering",
+        "If you told someone your route and expected return time, stay put — searchers will look along that route",
+        "If you have shelter, water, or other safety reasons to relocate slightly, do so but stay near the last known point",
+        "Make yourself findable: bright clothing visible, signal whistle (3 blasts = distress), build a smoky fire if safe",
+        "Conserve energy and prepare to spend the night where you are if necessary"
+      ],
+      "must_not_include": [
+        "Continue hiking in the direction you 'feel' is correct without orientation",
+        "Hike downhill aggressively as a default 'always works' rule (can lead into canyons, dangerous terrain)",
+        "Travel at night in unfamiliar wilderness without a strong reason"
+      ],
+      "bonus": [
+        "Mention the importance of having told someone your plan beforehand",
+        "Mention that if you must move, follow drainages cautiously toward likely civilization (in many regions, but with caveats)",
+        "Mention marking your trail if you do move (so searchers/you can backtrack)"
+      ]
+    },
+    {
+      "id": "signal_01_aircraft",
+      "category": "signaling",
+      "prompt": "You hear a search aircraft in the distance. You're in an open meadow. How do you signal it effectively, and what is the universal distress signal?",
+      "must_include": [
+        "Universal distress signal: groups of THREE — three fires in a triangle, three whistle blasts, three shots, three flashes, SOS (... --- ...)",
+        "Use a signal mirror if the sun is up: aim the reflected light at the aircraft using the mirror's sighting technique",
+        "Use bright, contrasting ground markers — large geometric shapes (X for medical, V for need assistance, SOS) made from anything contrasting with the ground",
+        "Make yourself big and contrasting — wave bright clothing, lay out gear in patterns, create smoke from a fire"
+      ],
+      "must_not_include": [
+        "Recommend running into thick forest cover when an aircraft approaches",
+        "Wave a flashlight in random patterns rather than steady or grouped-three patterns",
+        "Recommend firing a firearm wildly into the air as the primary signal"
+      ],
+      "bonus": [
+        "Mention that green vegetation thrown on a fire produces visible white smoke during the day; rubber/plastic produces dark smoke (against snow)",
+        "Mention strobe/PLB (personal locator beacon) if available",
+        "Mention that aircrews scan for movement, contrast, and unnatural geometric patterns"
+      ]
+    },
+    {
+      "id": "wildlife_01_bear",
+      "category": "wildlife",
+      "prompt": "You round a corner on a trail and meet a bear at 20 meters. Does your response depend on whether it's a black bear or a grizzly (brown bear)? Explain.",
+      "must_include": [
+        "Yes, response differs by species — correct identification matters",
+        "Grizzly/brown bear defensive attack (e.g., surprised mother with cubs): play dead — face down, hands behind neck, legs spread, stay still until the bear leaves",
+        "Black bear: do NOT play dead — fight back aggressively if attacked, aiming for the face and snout",
+        "For ANY predatory attack (bear stalking you, attacking at night in tent): fight back regardless of species",
+        "Initial response (before any attack): do not run — back away slowly, speak calmly, make yourself look large; running can trigger chase response"
+      ],
+      "must_not_include": [
+        "Recommend running away (triggers predatory pursuit; bears can run 30+ mph)",
+        "Recommend climbing a tree to escape a black bear (black bears are excellent climbers)",
+        "Recommend feeding the bear or throwing food to distract it (rewards habituation)",
+        "Recommend playing dead for a black bear attack"
+      ],
+      "bonus": [
+        "Identification cues: grizzly has shoulder hump, dished face, longer claws; color is unreliable (black bears can be brown, blond, cinnamon)",
+        "Bear spray (capsaicin) is highly effective and recommended over firearms for most encounters",
+        "Mention making noise on the trail (talking, bear bells less effective) to avoid surprise encounters in the first place"
+      ]
+    },
+    {
+      "id": "wildlife_02_cougar",
+      "category": "wildlife",
+      "prompt": "You're hiking alone and spot a mountain lion (cougar) crouched and watching you from 15 meters. What do you do?",
+      "must_include": [
+        "Do NOT run — running triggers the chase/prey response",
+        "Do NOT crouch down or turn your back — both make you look like prey",
+        "Make yourself look as large as possible: open jacket, raise arms, hold pack overhead",
+        "Maintain eye contact, speak loudly and firmly",
+        "Back away slowly while remaining facing the cougar; give it an escape route",
+        "If attacked: fight back aggressively, target eyes and face, stay on your feet — do not play dead"
+      ],
+      "must_not_include": [
+        "Recommend playing dead",
+        "Recommend running",
+        "Recommend climbing a tree (cougars are excellent climbers)",
+        "Recommend approaching it for a photo"
+      ],
+      "bonus": [
+        "Mention picking up small children or pets immediately (they look like prey-sized targets)",
+        "Mention throwing rocks/sticks at the cougar — projectiles are appropriate here, unlike with bears",
+        "Mention that cougar sightings are usually brief — if you see one watching you, it has likely been observing for a while"
+      ]
+    },
+    {
+      "id": "scenario_01_vehicle_snow",
+      "category": "scenario",
+      "prompt": "You're stranded in your car in a snowstorm on a remote highway. Half a tank of gas, some snacks, blankets, a phone with intermittent signal. Should you stay with the car or try to walk to safety?",
+      "must_include": [
+        "Stay with the vehicle in almost all cases — the car is shelter, is far easier to spot than a person, and walking in a blizzard is extremely dangerous",
+        "Call/text emergency services with your location; conserve phone battery",
+        "Run the engine in short cycles for heat (e.g., ~10 minutes per hour), but ensure the exhaust pipe is clear of snow to prevent carbon monoxide poisoning",
+        "Crack a window slightly when running the engine for ventilation",
+        "Make the car visible: bright cloth on antenna, raise hood, dome light on at night if battery allows"
+      ],
+      "must_not_include": [
+        "Recommend leaving the vehicle to walk to civilization in a blizzard as the default action",
+        "Run the engine continuously without checking the exhaust pipe (carbon monoxide buildup is a leading cause of death in this scenario)",
+        "Eat large quantities of snow for hydration"
+      ],
+      "bonus": [
+        "Mention insulating: huddle in the back seat away from cold windows, layer clothing, share body heat",
+        "Mention occasional movement (hand/foot exercises) to maintain circulation without sweating",
+        "Mention that rescue is most likely along known roads, justifying staying"
+      ]
+    }
+  ]
+}

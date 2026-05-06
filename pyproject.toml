@@ -1,0 +1,110 @@
+[project]
+name = "survival-bench"
+version = "0.1.0"
+description = "Rubric-graded survival/wilderness-medicine benchmark for OpenAI-compatible LLM endpoints (OpenRouter, LM Studio, vLLM, Ollama)."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Stephen Matta" }]
+requires-python = ">=3.10"
+keywords = ["llm", "benchmark", "survival", "wilderness", "calibration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+]
+# Runtime is stdlib-only; no install required to run the bench.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "poethepoet>=0.27",
+    "pre-commit>=3.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/sjmatta/survival-bench"
+Issues = "https://github.com/sjmatta/survival-bench/issues"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["bench", "build_bench"]
+
+# ─────────── poethepoet tasks ───────────
+[tool.poe.tasks.build]
+cmd = "python build_bench.py"
+help = "Build bench.json from questions.json + calibration_questions.json + inline homestead additions"
+
+[tool.poe.tasks.lint]
+cmd = "ruff check ."
+help = "Run ruff lint"
+
+[tool.poe.tasks.format]
+cmd = "ruff format ."
+help = "Format with ruff"
+
+[tool.poe.tasks.test]
+cmd = "pytest -q"
+help = "Run pytest"
+
+[tool.poe.tasks.check]
+sequence = ["lint", "test"]
+help = "Run lint + tests"
+
+[tool.poe.tasks.resolve-images]
+cmd = "python bench.py resolve-images --questions vision_questions.json"
+help = "Populate image_url fields in vision_questions.json via Wikipedia API"
+
+[tool.poe.tasks.resolve-audio]
+cmd = "python bench.py resolve-audio --questions audio_questions.json"
+help = "Download Wikimedia / xeno-canto audio clips and convert to mp3 in audio_clips/"
+
+[tool.poe.tasks.bench-text]
+cmd = "python bench.py all --questions bench.json --out-dir results --resume"
+help = "Run the unified text benchmark (build + generate + judge + report)"
+
+[tool.poe.tasks.bench-vision]
+cmd = "python bench.py all --questions vision_questions.json --out-dir results-vision --resume"
+help = "Run the vision benchmark"
+
+[tool.poe.tasks.bench-audio]
+cmd = "python bench.py all --questions audio_questions.json --out-dir results-audio --resume"
+help = "Run the audio benchmark"
+
+[tool.poe.tasks.list-models]
+cmd = "python bench.py models"
+help = "List models exposed by the configured endpoint"
+
+# ─────────── ruff ───────────
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (we have a few long rubric strings)
+    "B008",  # function-call-in-default-argument
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ─────────── pytest ───────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["error::DeprecationWarning"]

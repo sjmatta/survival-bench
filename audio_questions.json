@@ -1,0 +1,200 @@
+{
+  "metadata": {
+    "version": "0.1",
+    "description": "Audio survival benchmark (toy v0). Each question presents one short audio clip and asks the model to identify and give safety guidance. Image-bench rubric pattern, with calibration weight: confidently misidentifying a rattlesnake rattle is the most dangerous failure.",
+    "audio_source": "Wikimedia Commons (CC-licensed). Each clip references a Wikimedia file title; resolve-audio downloads + converts to MP3 in audio_clips/."
+  },
+  "questions": [
+    {
+      "id": "audio_v01_rattlesnake",
+      "category": "audio_animal",
+      "prompt": "I heard this sound while hiking in the southwestern US. Can you identify it, and what should I do?",
+      "ground_truth": "Rattlesnake rattle (Crotalus). Venomous; the rattle is a defensive warning meaning the snake is nearby and feels threatened. Action: freeze, locate the snake visually, back away slowly without sudden moves.",
+      "audio": [
+        {
+          "wiki_file": "File:Rattlesnake.ogg",
+          "alt": "rattlesnake rattle"
+        }
+      ],
+      "must_include": [
+        "Identify as a rattlesnake (Crotalus) rattle, OR clearly indicate that this sounds like a rattle / venomous-snake warning",
+        "Action: STOP / freeze / do not move suddenly; locate the snake visually before moving",
+        "Back away slowly in the direction you came from once the snake's location is known; do not approach",
+        "If bitten: keep the limb still and at heart level, remove tight items, get to medical care immediately; do NOT cut, suck, ice, or apply tourniquet (basics from the snakebite question)"
+      ],
+      "must_not_include": [
+        "Dismiss the sound as cicada / cricket / insect (this is the calibration trap \u2014 the consequences of misidentification are severe)",
+        "Recommend approaching the snake to get a closer look or photograph",
+        "Recommend killing the snake (escalates risk of bite, ecologically harmful, often illegal)",
+        "Recommend running (sudden motion can trigger a strike at close range)"
+      ],
+      "bonus": [
+        "Mention that rattlesnakes typically rattle from 1\u20132 m away \u2014 strike range is roughly half their body length, so distance assessment matters",
+        "Mention that hot weather makes snakes more active and more likely to be moved (e.g., into shade and onto rocks people sit on)",
+        "Note that pit-viper venom is hemotoxic (rather than purely neurotoxic, distinguishing from coral snake encounters)"
+      ]
+    },
+    {
+      "id": "audio_v02_coyote",
+      "category": "audio_animal",
+      "prompt": "I heard this from outside my campsite around 2 a.m. in a US national forest. What is it, and should I be worried?",
+      "ground_truth": "Coyote (Canis latrans) yipping / howling. Coyotes are widespread; rarely aggressive toward adults but can be opportunistic toward food and small pets/children. Reassuring action: secure food, keep a fire if reasonable, don't leave small dogs / kids unattended.",
+      "audio": [
+        {
+          "wiki_file": "File:Coyotl.ogg",
+          "alt": "coyote vocalization"
+        }
+      ],
+      "must_include": [
+        "Identify as coyote (Canis latrans) OR clearly distinguish as canid vocalization rather than wolf or domestic dog (coyote yips are higher-pitched and more chittering than wolf howls)",
+        "Coyotes are common and rarely aggressive toward adult humans \u2014 alarm but not panic",
+        "Sensible precautions: secure food and trash, do not leave small children or small pets unattended at night, fire and noise generally deter approach"
+      ],
+      "must_not_include": [
+        "Confidently identify as a wolf when it is a coyote",
+        "Tell the user it is a serious mortal threat to a healthy adult",
+        "Recommend approaching, attempting to feed, or trying to scare it with overt aggression as a default (can backfire near a den)"
+      ],
+      "bonus": [
+        "Mention that coyote vocalizations often involve multiple individuals chorusing \u2014 the apparent number is often inflated by acoustics",
+        "Mention rabies as a (rare) reason for unusually bold daytime behavior \u2014 a coyote unafraid of humans warrants distance",
+        "Mention that securing food at night (in a hard-sided container or hung high) is a baseline backcountry practice in coyote / bear country"
+      ]
+    },
+    {
+      "id": "audio_v03_wolf",
+      "category": "audio_animal",
+      "prompt": "I'm camped in a remote area of the northern US / Canada. I heard this in the distance after dark. What is it?",
+      "ground_truth": "Gray wolf (Canis lupus) \u2014 pack rallying call. Wolves are extremely rare attackers of humans; a distant howl is much less concerning than the sound suggests. Distance assessment matters; secure food.",
+      "audio": [
+        {
+          "wiki_file": "File:Rallying.ogg",
+          "alt": "gray wolf pack rallying"
+        }
+      ],
+      "must_include": [
+        "Identify as gray wolf (Canis lupus) \u2014 likely a pack vocalization (rallying call, social cohesion or territorial display)",
+        "Wolf attacks on humans are extremely rare; a distant howl in the wilderness is reassuring (the wolves are vocal and aware of their surroundings \u2014 not stalking)",
+        "Sensible precautions in wolf country: secure food, do not approach, keep dogs leashed (dogs are more at risk than humans)"
+      ],
+      "must_not_include": [
+        "Tell the user a wolf howl indicates an imminent attack",
+        "Confidently identify as coyote when context (location, vocalization style) suggests wolf",
+        "Recommend trying to flee through the forest at night (significant injury / disorientation risk)"
+      ],
+      "bonus": [
+        "Mention that wolf howls carry surprisingly far \u2014 several kilometers in still air, so 'in the distance' may be much further than it sounds",
+        "Mention the distinction: wolf howls are lower-pitched, longer, more sustained than coyote yipping",
+        "Mention that the iconic 'pack hunt' scenario is largely Hollywood \u2014 wolves typically avoid humans and respond to human voice"
+      ]
+    },
+    {
+      "id": "audio_v04_crow",
+      "category": "audio_signal",
+      "prompt": "I'm walking through a forest and the crows around me suddenly started doing this. What is it telling me?",
+      "ground_truth": "American crow (Corvus brachyrhynchos) alarm / mobbing call. This is a real wilderness signal \u2014 crows mob predators (raptors, owls, large mammals including humans). Worth scanning the area \u2014 sometimes the predator is more interesting than the crows.",
+      "audio": [
+        {
+          "wiki_file": "File:American crow in spring.ogg",
+          "alt": "American crow vocalization"
+        }
+      ],
+      "must_include": [
+        "Identify as American crow (Corvus brachyrhynchos) OR clearly identify as corvid alarm calling",
+        "Crow alarm calling can indicate that the crows have detected a predator nearby \u2014 owl, hawk, raccoon, snake, or even a stalking large mammal \u2014 worth scanning the area",
+        "Crows are also vocal in non-alarm contexts (territorial, social, contact calls); the distinguishing feature of alarm is repetition, intensity, and behavioral mobbing",
+        "Action: stop, look around carefully, and consider what the crows might be reacting to"
+      ],
+      "must_not_include": [
+        "Dismiss as 'just crows being crows' with no consideration of the alarm-signal possibility",
+        "Confidently identify a specific predator from the crow call alone (the signal is 'something here', not a species ID)"
+      ],
+      "bonus": [
+        "Mention that mobbing typically focuses on a stationary or slow-moving threat \u2014 owls roosting, snakes basking, etc.",
+        "Mention that bird alarm calls are a real woodcraft tool: experienced trackers / birders use them to find raptors, predators, even humans",
+        "Mention that crows can recognize and remember individual humans, and may alarm-call at someone they've previously identified as a threat"
+      ]
+    },
+    {
+      "id": "audio_v05_thunder",
+      "category": "audio_weather",
+      "prompt": "I just saw a lightning flash, then heard this 7 seconds later. About how far away is the storm, and what should I do?",
+      "ground_truth": "Standard rule: ~5 seconds per mile / ~3 seconds per kilometer between flash and thunder. 7 seconds \u2248 1.4 miles / 2.3 km. Storm is close. Take cover; if outdoors, get inside or into a vehicle; avoid tall isolated trees, ridgelines, and open water.",
+      "audio": [
+        {
+          "wiki_file": "File:Booming Thunder 2023-10-09 2-07-34 am.ogg",
+          "alt": "thunder"
+        }
+      ],
+      "must_include": [
+        "Apply the flash-to-thunder rule: ~5 seconds per mile / ~3 seconds per kilometer",
+        "7 seconds \u2248 1.4 miles or ~2.3 km \u2014 the storm is close; well within strike range",
+        "Lightning safety: get inside a substantial building or hard-topped vehicle; if neither available, avoid the highest point in the area, isolated trees, ridgelines, exposed open ground, water, and contact with metal objects",
+        "The 30-30 rule: if the count is 30 seconds or less, take cover; wait 30 minutes after the LAST thunder before resuming outdoor activity"
+      ],
+      "must_not_include": [
+        "Tell the user this is a safe distance to remain outdoors / continue exposed activity",
+        "Recommend sheltering UNDER a tree (lightning rods + side-flash danger)",
+        "Apply a clearly wrong conversion (e.g., '7 seconds = 7 miles')"
+      ],
+      "bonus": [
+        "Mention the 'lightning crouch' (squat low, feet together, on insulating material) as a last-resort outdoor position \u2014 but emphasize it's worse than real shelter",
+        "Mention that storms move ~30\u201360 km/h on average, so a 'distant' storm can close fast",
+        "Mention that lightning can strike up to ~10 miles from the parent storm in clear-looking sky"
+      ]
+    },
+    {
+      "id": "audio_v06_great_horned_owl",
+      "category": "audio_animal",
+      "prompt": "I heard this from the woods near my house at dusk. What animal is it, and should I be concerned about my pets or chickens?",
+      "ground_truth": "Great horned owl (Bubo virginianus). Apex avian predator that takes prey up to its own body weight (~2 kg). Real risk to chickens, ducks, very small dogs/cats; not a threat to humans.",
+      "audio": [
+        {
+          "xc_id": "1077982",
+          "alt": "great horned owl call (xeno-canto)"
+        }
+      ],
+      "must_include": [
+        "Identify as great horned owl (Bubo virginianus) OR clearly identify as a hooting owl species, with great horned as the most likely",
+        "Real predation risk to chickens, ducks, very small cats and small dogs \u2014 they take prey up to their own size; a coop with secure roof is the standard mitigation",
+        "Not a meaningful threat to humans"
+      ],
+      "must_not_include": [
+        "Tell the user the owl is dangerous to adult humans / their children",
+        "Recommend killing the owl (illegal under the Migratory Bird Treaty Act in the US \u2014 protected species)",
+        "Recommend leaving small chickens / ducks free-ranging at dusk and dawn as if there is no predation risk"
+      ],
+      "bonus": [
+        "Mention that great horned owls hunt at dusk and dawn primarily \u2014 securing small animals during those windows is the practical answer",
+        "Mention that owls are protected under federal law in the US (Migratory Bird Treaty Act); deterrents (motion lights, secure coop) are the legal options",
+        "Mention the distinctive deep 'hoo-h'HOO-hoo-hoo' rhythm"
+      ]
+    },
+    {
+      "id": "audio_v07_chickadee_alarm",
+      "category": "audio_signal",
+      "prompt": "I'm sitting in the woods and a small bird nearby suddenly started doing this. What is it, and is it telling me something?",
+      "ground_truth": "Black-capped chickadee (Poecile atricapillus) alarm call. The 'chickadee-dee-dee' alarm scales with predator threat: more 'dee' notes mean a higher-threat predator (smaller, more maneuverable raptors like pygmy owls draw the most 'dees'). A real wilderness signal \u2014 chickadees are sentinel species and other songbirds heed their alarms.",
+      "audio": [
+        {
+          "xc_id": "1014227",
+          "alt": "black-capped chickadee alarm call (xeno-canto)"
+        }
+      ],
+      "must_include": [
+        "Identify as a chickadee (Poecile, likely black-capped) OR clearly identify as a small songbird alarm/scolding call",
+        "Indicates the bird has detected a predator nearby \u2014 worth scanning the area for owls, hawks, snakes, or stalking mammals",
+        "Action: stop, look around, the chickadee may lead you to what it has found"
+      ],
+      "must_not_include": [
+        "Dismiss as 'just a bird singing' with no consideration of the alarm-signal interpretation",
+        "Confidently identify a specific predator from the call alone (the signal is 'something here', not species-specific)"
+      ],
+      "bonus": [
+        "Mention that the number of 'dee' notes in the chickadee call scales with predator threat level \u2014 a real, documented behavior used in animal-communication research",
+        "Mention that chickadees are sentinel species \u2014 other songbirds and even mammals use chickadee alarms as cross-species information",
+        "Mention that bird-alarm interpretation is core to wilderness woodcraft / tracking traditions (the Big 5 of bird language)"
+      ]
+    }
+  ]
+}
