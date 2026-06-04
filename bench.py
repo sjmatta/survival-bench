@@ -156,6 +156,8 @@ def chat(
     temperature: float = 0.3,
     max_tokens: int = 1024,
     timeout: int = DEFAULT_TIMEOUT,
+    reasoning_effort: str = "",
+    provider_order: list[str] | None = None,
 ) -> tuple[str, dict]:
     if images or audio:
         user_content: list[dict] | str = [{"type": "text", "text": user}]
@@ -165,6 +167,13 @@ def chat(
             user_content.append({"type": "input_audio", "input_audio": {"data": data, "format": fmt}})
     else:
         user_content = user
+    # Newer OpenAI models (gpt-5+, o1+, o3+) require `max_completion_tokens` and
+    # reject `max_tokens` outright. Detect by model id.
+    token_field = (
+        "max_completion_tokens"
+        if re.match(r"^(gpt-[5-9]|o[1-9])", model)
+        else "max_tokens"
+    )
     payload = {
         "model": model,
         "messages": [
@@ -172,9 +181,13 @@ def chat(
             {"role": "user", "content": user_content},
         ],
         "temperature": temperature,
-        "max_tokens": max_tokens,
+        token_field: max_tokens,
         "stream": False,
     }
+    if reasoning_effort:
+        payload["reasoning"] = {"effort": reasoning_effort}
+    if provider_order:
+        payload["provider"] = {"order": provider_order, "allow_fallbacks": False}
     t0 = time.time()
     resp = http_post_json_retry(f"{base}/chat/completions", payload, api_key=api_key, timeout=timeout)
     elapsed = time.time() - t0
@@ -456,6 +469,11 @@ def cmd_generate(args: argparse.Namespace) -> None:
                 api_key=args.api_key,
                 temperature=args.temperature,
                 max_tokens=args.max_tokens,
+                reasoning_effort=getattr(args, "reasoning_effort", "") or "",
+                provider_order=(
+                    [p.strip() for p in (getattr(args, "provider_order", "") or "").split(",") if p.strip()]
+                    or None
+                ),
             )
             return model, q["id"], {"text": text, **meta, "error": None}
         except Exception as e:
@@ -862,6 +880,17 @@ def main() -> None:
     sp.add_argument("--concurrency", type=int, default=64, help="parallel API calls")
     sp.add_argument("--out-dir", help="results directory (default ./results)")
     sp.add_argument("--resume", action="store_true", help="skip models with complete answer files")
+    sp.add_argument(
+        "--reasoning-effort",
+        default="",
+        choices=["", "low", "medium", "high"],
+        help="OpenRouter-style reasoning.effort; empty = no reasoning field sent",
+    )
+    sp.add_argument(
+        "--provider-order",
+        default="",
+        help="comma-separated OpenRouter providers to pin (e.g. 'DeepInfra'); empty = default routing",
+    )
     sp.set_defaults(func=cmd_generate)
 
     sp = sub.add_parser("judge", help="judge each answer with a judge model")
@@ -899,6 +928,10 @@ def main() -> None:
     sp.add_argument("--judge-model")
     sp.add_argument("--out-dir")
     sp.add_argument("--resume", action="store_true")
+    sp.add_argument(
+        "--reasoning-effort", default="", choices=["", "low", "medium", "high"],
+    )
+    sp.add_argument("--provider-order", default="")
     sp.set_defaults(func=cmd_all)
 
     args = p.parse_args()

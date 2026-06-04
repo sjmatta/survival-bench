@@ -13,7 +13,9 @@
       "audio": [
         {
           "wiki_file": "File:Rattlesnake.ogg",
-          "alt": "rattlesnake rattle"
+          "alt": "rattlesnake rattle",
+          "local_path": "audio_clips/audio_v01_rattlesnake_0.mp3",
+          "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/22/Rattlesnake.ogg"
         }
       ],
       "must_include": [
@@ -42,7 +44,9 @@
       "audio": [
         {
           "wiki_file": "File:Coyotl.ogg",
-          "alt": "coyote vocalization"
+          "alt": "coyote vocalization",
+          "local_path": "audio_clips/audio_v02_coyote_0.mp3",
+          "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/6c/Coyotl.ogg"
         }
       ],
       "must_include": [
@@ -69,7 +73,8 @@
       "audio": [
         {
           "wiki_file": "File:Rallying.ogg",
-          "alt": "gray wolf pack rallying"
+          "alt": "gray wolf pack rallying",
+          "local_path": "audio_clips/audio_v03_wolf_0.mp3"
         }
       ],
       "must_include": [
@@ -96,7 +101,8 @@
       "audio": [
         {
           "wiki_file": "File:American crow in spring.ogg",
-          "alt": "American crow vocalization"
+          "alt": "American crow vocalization",
+          "local_path": "audio_clips/audio_v04_crow_0.mp3"
         }
       ],
       "must_include": [
@@ -123,7 +129,8 @@
       "audio": [
         {
           "wiki_file": "File:Booming Thunder 2023-10-09 2-07-34 am.ogg",
-          "alt": "thunder"
+          "alt": "thunder",
+          "local_path": "audio_clips/audio_v05_thunder_0.mp3"
         }
       ],
       "must_include": [
@@ -151,7 +158,9 @@
       "audio": [
         {
           "xc_id": "1077982",
-          "alt": "great horned owl call (xeno-canto)"
+          "alt": "great horned owl call (xeno-canto)",
+          "local_path": "audio_clips/audio_v06_great_horned_owl_0.mp3",
+          "source_url": "https://xeno-canto.org/1077982/download"
         }
       ],
       "must_include": [
@@ -178,7 +187,9 @@
       "audio": [
         {
           "xc_id": "1014227",
-          "alt": "black-capped chickadee alarm call (xeno-canto)"
+          "alt": "black-capped chickadee alarm call (xeno-canto)",
+          "local_path": "audio_clips/audio_v07_chickadee_alarm_0.mp3",
+          "source_url": "https://xeno-canto.org/1014227/download"
         }
       ],
       "must_include": [
