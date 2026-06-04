@@ -143,14 +143,12 @@ for audio, add `audio: [{"wiki_file": "File:..."}]` or
 
 ## Results
 
-Headline standings from a multi-provider run, judged by `claude-sonnet-4.6`.
-Composite = correctness + 0.25·bonus − 0.5·violations. Numbers are illustrative —
-re-running on your endpoint produces fresh ones.
-
-The tables below are the **current-gen open-weight models that fit consumer
-hardware** — the bench's off-grid conceit. Closed frontier models, local-quant /
-abliteration experiments, the Gemma 4 12B local run, full methodology, and the
-judge-migration note all live in **[RESULTS.md](RESULTS.md)**.
+Headline standings, judged by `claude-sonnet-4.6`. Composite = correctness +
+0.25·bonus − 0.5·violations; numbers are illustrative. These are the
+**current-gen open-weight models that fit a 36 GB laptop** — the off-grid
+conceit. The `gemma-4-12b-it` row (†) was run locally (Q8_0); the rest are cloud
+fp8/fp16 proxies for the same downloadable weights. Frontier models,
+local-hardware experiments, and full methodology are in **[RESULTS.md](RESULTS.md)**.
 
 **Text** (45 questions):
 
@@ -160,6 +158,7 @@ judge-migration note all live in **[RESULTS.md](RESULTS.md)**.
 | `qwen/qwen3.6-35b-a3b` | +0.77 | 72% | 4 |
 | `google/gemma-4-31b-it` | +0.74 | 69% | 3 |
 | `google/gemma-4-26b-a4b-it` | +0.68 | 66% | 5 |
+| `google/gemma-4-12b-it` † | +0.49 | 56% | 11 |
 | `google/gemma-3n-e4b-it` | +0.46 | 52% | 11 |
 
 **Vision** (12 questions):
@@ -170,6 +169,7 @@ judge-migration note all live in **[RESULTS.md](RESULTS.md)**.
 | `qwen/qwen3.6-35b-a3b` | +0.77 | 74% | 1 |
 | `google/gemma-4-26b-a4b-it` | +0.58 | 58% | 1 |
 | `google/gemma-4-31b-it` | +0.53 | 51% | 0 |
+| `google/gemma-4-12b-it` † | +0.28 | 42% | 4 |
 
 **Audio** (7 questions — small set, judge-fragile; treat as indicative):
 
@@ -180,7 +180,13 @@ judge-migration note all live in **[RESULTS.md](RESULTS.md)**.
 | `mistralai/voxtral-small-24b-2507` | +0.43 | 40% | 0 |
 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | +0.42 | 42% | 0 |
 | `openai/gpt-audio-mini` | +0.38 | 36% | 0 |
+| `google/gemma-4-12b-it` †‡ | +0.37 | 32% | 0 |
 | `openai/gpt-audio` | +0.35 | 35% | 0 |
+
+> † Local Q8_0 on an M4 Max — the only row run on the off-grid hardware itself
+> (others are cloud fp8/fp16 proxies; Q8 ≈ fp16). ‡ Speech-only audio encoder:
+> accurate ASR but misreads environmental sounds, hence the field's lowest audio
+> correctness (32%). Full writeup in [RESULTS.md](RESULTS.md).
 
 **The short version:** open-weight `qwen3.6-27b` is the strongest local pick —
 ~0.09 below the GPT-5.5 text ceiling (+0.88) and actually *beating* GPT-5.5 on
