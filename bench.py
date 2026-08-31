@@ -169,11 +169,7 @@ def chat(
         user_content = user
     # Newer OpenAI models (gpt-5+, o1+, o3+) require `max_completion_tokens` and
     # reject `max_tokens` outright. Detect by model id.
-    token_field = (
-        "max_completion_tokens"
-        if re.match(r"^(gpt-[5-9]|o[1-9])", model)
-        else "max_tokens"
-    )
+    token_field = "max_completion_tokens" if re.match(r"^(gpt-[5-9]|o[1-9])", model) else "max_tokens"
     payload = {
         "model": model,
         "messages": [
@@ -929,7 +925,9 @@ def main() -> None:
     sp.add_argument("--out-dir")
     sp.add_argument("--resume", action="store_true")
     sp.add_argument(
-        "--reasoning-effort", default="", choices=["", "low", "medium", "high"],
+        "--reasoning-effort",
+        default="",
+        choices=["", "low", "medium", "high"],
     )
     sp.add_argument("--provider-order", default="")
     sp.set_defaults(func=cmd_all)

@@ -18,10 +18,10 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "ruff>=0.6",
-    "poethepoet>=0.27",
-    "pre-commit>=3.7",
+    "pytest>=9.1.1",
+    "ruff>=0.16.5",
+    "poethepoet>=0.48.0",
+    "pre-commit>=4.6.2",
 ]
 
 [project.urls]
@@ -29,7 +29,7 @@ Homepage = "https://github.com/sjmatta/survival-bench"
 Issues = "https://github.com/sjmatta/survival-bench/issues"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
