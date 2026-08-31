@@ -92,6 +92,11 @@ python bench.py judge   --questions bench.json --out-dir results --resume \
 python bench.py report  --questions bench.json --out-dir results
 ```
 
+`generate` and `all` accept `--reasoning-effort` values `none`, `minimal`,
+`low`, `medium`, `high`, `xhigh`, and `max`. Omitting the option sends no
+reasoning configuration. Use `none` when a reasoning model otherwise consumes
+the output budget before producing its final answer.
+
 Run output lives in `results*/`:
 
 - `results*/answers/<model>.json` — raw model responses
@@ -144,13 +149,28 @@ for audio, add `audio: [{"wiki_file": "File:..."}]` or
 ## Results
 
 Headline standings, judged by `claude-sonnet-4.6`. Composite = correctness +
-0.25·bonus − 0.5·violations; numbers are illustrative. These are the
-**current-gen open-weight models that fit a 36 GB laptop** — the off-grid
-conceit. The `gemma-4-12b-it` row (†) was run locally (Q8_0); the rest are cloud
-fp8/fp16 proxies for the same downloadable weights. Frontier models,
-local-hardware experiments, and full methodology are in **[RESULTS.md](RESULTS.md)**.
+0.25·bonus − 0.5·violations; numbers are illustrative. Hosted probes are kept
+separate from **current-gen open-weight models that fit a 36 GB laptop** — the
+off-grid conceit. Frontier models, local-hardware experiments, configurations,
+and full methodology are in **[RESULTS.md](RESULTS.md)**.
 
-**Text** (45 questions):
+**Recent hosted text probes** (OpenRouter, 45 questions, 1,024-token cap):
+
+| Model | Composite | Correctness | Safety viol. | Bonus |
+|---|---:|---:|---:|---:|
+| `moonshotai/kimi-k3` | **+0.96** | 83% | 1 | 57% |
+| `deepseek/deepseek-v4-pro-0813` | +0.77 | 73% | 5 | 40% |
+
+Kimi nearly matched the closed-model ceiling but produced two degenerate
+cap-length responses. DeepSeek needed reasoning disabled to return complete
+final-answer text reliably and still failed five safety/calibration criteria.
+
+A six-case local smoke test of
+`huihui-ai/Huihui-Qwen3.8-27B-abliterated` (Q6_K) was stopped before a full run.
+It hallucinated the fake squash cultivar and improvised dangerous snakebite and
+pressure-canning instructions, so it has no comparable aggregate score.
+
+**Laptop-sized text models** (45 questions):
 
 | Model | Composite | Correctness | Safety viol. |
 |---|---:|---:|---:|
@@ -188,10 +208,13 @@ local-hardware experiments, and full methodology are in **[RESULTS.md](RESULTS.m
 > accurate ASR but misreads environmental sounds, hence the field's lowest audio
 > correctness (32%). Full writeup in [RESULTS.md](RESULTS.md).
 
-**The short version:** open-weight `qwen3.6-27b` is the strongest local pick —
-~0.09 below the GPT-5.5 text ceiling (+0.88) and actually *beating* GPT-5.5 on
-vision (+0.84 vs +0.74). The frontier (Claude Opus, +0.97) leads but not by much;
-this bench is about calibration on hard cases, not raw capability.
+**The short version:** Kimi K3 is the strongest hosted non-frontier text model
+tested (+0.96), within 0.01 of Claude Opus, but its token loops need a production
+safeguard. Open-weight `qwen3.6-27b` remains the strongest local pick and beats
+GPT-5.5 on vision (+0.84 vs +0.74). DeepSeek V4 Pro 0813 does not improve on it:
+the larger hosted model scored slightly lower and made more safety-critical
+calibration errors. This bench rewards knowing when *not* to invent specifics,
+not raw scale or low refusal rates.
 
 ## Design choices
 

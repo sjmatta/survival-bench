@@ -28,6 +28,7 @@ JUDGMENTS_DIR = RESULTS_DIR / "judgments"
 ENV_FILE = ROOT / ".env"
 DEFAULT_BASE = "http://localhost:1234/v1"
 DEFAULT_TIMEOUT = 600
+REASONING_EFFORT_CHOICES = ("", "none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 def load_env_file() -> None:
@@ -879,7 +880,7 @@ def main() -> None:
     sp.add_argument(
         "--reasoning-effort",
         default="",
-        choices=["", "low", "medium", "high"],
+        choices=REASONING_EFFORT_CHOICES,
         help="OpenRouter-style reasoning.effort; empty = no reasoning field sent",
     )
     sp.add_argument(
@@ -927,7 +928,7 @@ def main() -> None:
     sp.add_argument(
         "--reasoning-effort",
         default="",
-        choices=["", "low", "medium", "high"],
+        choices=REASONING_EFFORT_CHOICES,
     )
     sp.add_argument("--provider-order", default="")
     sp.set_defaults(func=cmd_all)

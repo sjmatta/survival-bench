@@ -159,3 +159,20 @@ def test_slug_safe_filename():
     assert bench.slug("google/gemma-4-31b-it") == "google_gemma-4-31b-it"
     assert bench.slug("anthropic/claude-haiku-4.5") == "anthropic_claude-haiku-4.5"
     assert bench.slug("foo/bar:free") == "foo_bar_free"
+
+
+# ─── CLI reasoning controls ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("command", ["generate", "all"])
+def test_cli_accepts_all_openrouter_reasoning_efforts(command, monkeypatch):
+    captured = []
+    monkeypatch.setattr(bench, f"cmd_{command}", captured.append)
+
+    for effort in bench.REASONING_EFFORT_CHOICES:
+        argv = ["bench.py", command]
+        if effort:
+            argv.extend(["--reasoning-effort", effort])
+        monkeypatch.setattr(sys, "argv", argv)
+        bench.main()
+        assert captured.pop().reasoning_effort == effort
