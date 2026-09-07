@@ -86,11 +86,17 @@ Without poe, run the script directly:
 
 ```bash
 python bench.py generate --questions bench.json --out-dir results --resume \
-  --models "qwen/qwen3.6-27b,google/gemma-4-31b-it"
-python bench.py judge   --questions bench.json --out-dir results --resume \
-  --judge-model "anthropic/claude-sonnet-4.6"
-python bench.py report  --questions bench.json --out-dir results
+  --models "qwen/qwen3.8-27b" --reasoning-effort none --max-tokens 4000
+python bench.py generate --questions bench.json --out-dir results --resume \
+  --models "meta/muse-glimmer-30b" --max-tokens 8192
+# After grading:
+python bench.py report --questions bench.json --out-dir results
 ```
+
+**Current judge setup:** The Opus 5 evaluation used a run-specific wrapper with
+a larger judge budget and validation of final YES/NO output. The stock `judge`
+command still caps output at 128 tokens and is not sufficient for reproducing
+that run; see [configuration and verification](RESULTS.md#configuration-and-verification).
 
 `generate` and `all` accept `--reasoning-effort` values `none`, `minimal`,
 `low`, `medium`, `high`, `xhigh`, and `max`. Omitting the option sends no
@@ -148,73 +154,63 @@ for audio, add `audio: [{"wiki_file": "File:..."}]` or
 
 ## Results
 
-Headline standings, judged by `claude-sonnet-4.6`. Composite = correctness +
-0.25·bonus − 0.5·violations; numbers are illustrative. Hosted probes are kept
-separate from **current-gen open-weight models that fit a 36 GB laptop** — the
-off-grid conceit. Frontier models, local-hardware experiments, configurations,
-and full methodology are in **[RESULTS.md](RESULTS.md)**.
+The active evaluation cohort starts September 6, 2026, with **Claude Opus 5** as
+judge. The goal is useful offline knowledge on a **36 GB M4 Max laptop**; hosted
+runs screen models whose quantized weights could plausibly run there.
+Composite = correctness + 0.25·bonus − 0.5·violations per question, clipped at −1,
+then averaged. Results are illustrative, from one answer per question.
 
-**Recent hosted text probes** (OpenRouter, 45 questions, 1,024-token cap):
+**Latest laptop-sized comparison — September 6, 2026** (hosted and local generation,
+`anthropic/claude-opus-5` judge):
 
-| Model | Composite | Correctness | Safety viol. | Bonus |
-|---|---:|---:|---:|---:|
-| `moonshotai/kimi-k3` | **+0.96** | 83% | 1 | 57% |
-| `deepseek/deepseek-v4-pro-0813` | +0.77 | 73% | 5 | 40% |
+| Model | Text composite | Text correctness | Text violations | Vision composite | Vision correctness | Vision violations |
+|---|---:|---:|---:|---:|---:|---:|
+| `meta/muse-glimmer-30b` | **+0.85** | 78% | 4 | **+0.83** | 76% | 0 |
+| `qwen/qwen3.8-27b` | +0.77 | 76% | 8 | +0.62 | 65% | 3 |
+| K2 Horizon MoVA 36B-A4B, local Q4_K_M | +0.69 | 69% | 8 | — | — | — |
+| Granite 4.2 30B, local Q4_K_M | +0.58 | 64% | 10 | — | — | — |
+| `nvidia/nemotron-3.5-lightning` | +0.58 | 63% | 11 | — | — | — |
+| `ibm-granite/granite-4.2-8b` | +0.50 | 59% | 15 | — | — | — |
 
-Kimi nearly matched the closed-model ceiling but produced two degenerate
-cap-length responses. DeepSeek needed reasoning disabled to return complete
-final-answer text reliably and still failed five safety/calibration criteria.
+Muse leads both benches in the current cohort. The four additions completed the
+45-question text bench; dashes indicate unsupported vision input. Granite 30B
+and Nemotron are effectively tied on composite (their unrounded scores differ
+by less than 0.00003). The sharpest vision difference was the coral-snake photo:
+Muse identified the venomous snake and warned against handling; Qwen called it
+a harmless kingsnake and said it could be safely removed from the tent. Both
+invented knowledge about the fake squash cultivar. Counts are triggered
+`must_not_include` criteria, including refusal/calibration penalties, not counts
+of distinct dangerous answers.
 
-A six-case local smoke test of
-`huihui-ai/Huihui-Qwen3.8-27B-abliterated` (Q6_K) was stopped before a full run.
-It hallucinated the fake squash cultivar and improvised dangerous snakebite and
-pressure-canning instructions, so it has no comparable aggregate score.
+K2 and Granite 30B are measured local Q4_K_M runs on this laptop, using low
+reasoning effort and a 4,096-token cap. The other rows are hosted proxies for
+locally feasible models. Qwen used thinking off and a 4,000-token cap; Muse used
+default reasoning and an 8,192-token cap. Muse and Qwen completed 45 text and
+12 vision answers each. All four additions completed 45 text answers each.
+Full configuration, judge-budget repair, and review caveats are in
+[RESULTS.md](RESULTS.md).
 
-**Laptop-sized text models** (45 questions):
+Previous text, vision, audio, frontier, and local-hardware results are preserved
+in **[ARCHIVE.md](ARCHIVE.md)**. They are historical evidence, not an active rerun
+queue. Detailed current results are in **[RESULTS.md](RESULTS.md)**.
 
-| Model | Composite | Correctness | Safety viol. |
-|---|---:|---:|---:|
-| `qwen/qwen3.6-27b` | **+0.79** | 74% | 4 |
-| `qwen/qwen3.6-35b-a3b` | +0.77 | 72% | 4 |
-| `google/gemma-4-31b-it` | +0.74 | 69% | 3 |
-| `google/gemma-4-26b-a4b-it` | +0.68 | 66% | 5 |
-| `google/gemma-4-12b-it` † | +0.49 | 56% | 11 |
-| `google/gemma-3n-e4b-it` | +0.46 | 52% | 11 |
+### Next evaluations
 
-**Vision** (12 questions):
+The four requested additions are complete. Remaining optional work:
 
-| Model | Composite | Correctness | Safety viol. |
-|---|---:|---:|---:|
-| `qwen/qwen3.6-27b` | **+0.84** | 74% | 0 |
-| `qwen/qwen3.6-35b-a3b` | +0.77 | 74% | 1 |
-| `google/gemma-4-26b-a4b-it` | +0.58 | 58% | 1 |
-| `google/gemma-4-31b-it` | +0.53 | 51% | 0 |
-| `google/gemma-4-12b-it` † | +0.28 | 42% | 4 |
+| Candidate | What it adds | Access |
+|---|---|---|
+| LFM2.5-2.6B / VL-3B | Tiny text and vision models for a low-memory tier | Text on OpenRouter; vision needs another route |
+| MOSS Audio 4B Thinking + Audio Flamingo Next | Environmental-sound understanding for the seven-question audio bench | Local setup; Mac runtime validation needed |
+| Gemini 3.8 Flash | Fresh hosted audio reference | OpenRouter; not a laptop-weight candidate |
 
-**Audio** (7 questions — small set, judge-fragile; treat as indicative):
-
-| Model | Composite | Correctness | Safety viol. |
-|---|---:|---:|---:|
-| `xiaomi/mimo-v2.5` | **+0.54** | 51% | 0 |
-| `google/gemini-3.1-pro-preview` | +0.45 | 49% | 1 |
-| `mistralai/voxtral-small-24b-2507` | +0.43 | 40% | 0 |
-| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | +0.42 | 42% | 0 |
-| `openai/gpt-audio-mini` | +0.38 | 36% | 0 |
-| `google/gemma-4-12b-it` †‡ | +0.37 | 32% | 0 |
-| `openai/gpt-audio` | +0.35 | 35% | 0 |
-
-> † Local Q8_0 on an M4 Max — the only row run on the off-grid hardware itself
-> (others are cloud fp8/fp16 proxies; Q8 ≈ fp16). ‡ Speech-only audio encoder:
-> accurate ASR but misreads environmental sounds, hence the field's lowest audio
-> correctness (32%). Full writeup in [RESULTS.md](RESULTS.md).
-
-**The short version:** Kimi K3 is the strongest hosted non-frontier text model
-tested (+0.96), within 0.01 of Claude Opus, but its token loops need a production
-safeguard. Open-weight `qwen3.6-27b` remains the strongest local pick and beats
-GPT-5.5 on vision (+0.84 vs +0.74). DeepSeek V4 Pro 0813 does not improve on it:
-the larger hosted model scored slightly lower and made more safety-critical
-calibration errors. This bench rewards knowing when *not* to invent specifics,
-not raw scale or low refusal rates.
+[Candidate sources and local-fit qualifications](RESULTS.md#candidate-sources-and-remaining-evaluations)
+are maintained with the detailed results. Audio has no active-cohort score yet;
+the current two headline models accept no audio. The separate
+[audio research shortlist](AUDIO_CANDIDATES.md) explains the recommendations,
+including the limitations of the MOSS 8B community port. A local quantized Muse
+run and a thinking-enabled Qwen3.8 run would answer additional configuration
+questions. Archived models do not need to be rerun to keep this cohort current.
 
 ## Design choices
 
@@ -234,9 +230,10 @@ Wikimedia / xeno-canto sources by stable ID. Setup downloads them locally on
 demand. None of the source media is redistributed here.
 
 **Judge bias.** When the judge is one of the evaluated models, its own
-answers may be over-rated. The `must_not_include` count is the most objective
-signal — these are rule violations, not judgment calls. Run with two judges
-and compare if you suspect bias.
+answers may be over-rated. The `must_not_include` count makes individual
+failures inspectable, but
+verdicts still depend on interpretation. Review the underlying answers and
+criteria when a flag is ambiguous.
 
 ## Development
 
