@@ -190,25 +190,40 @@ default reasoning and an 8,192-token cap. Muse and Qwen completed 45 text and
 Full configuration, judge-budget repair, and review caveats are in
 [RESULTS.md](RESULTS.md).
 
+**Current audio comparison — September 6, 2026** (Opus 5 judge):
+
+| Model | Execution | Completed | Composite | Correctness | Violation flags |
+|---|---|---:|---:|---:|---:|
+| Gemini 3.8 Flash | OpenRouter; hosted reference | 7/7 | **+0.83** | 76% | 0 |
+| Audio Flamingo Next | Local BF16, Metal + CPU timing operation | 7/7 | −0.02 | 18% | 3 |
+| MOSS Audio 4B Thinking | Local MLX INT4 | 6/7 | — | — | — |
+
+MOSS's six completed answers scored **−0.17**, with 17% correctness and 4 flags;
+its wolf answer looped without a final response. That conditional score excludes
+the failed question and is not directly comparable to the full seven-question
+rows. Neither local candidate performed well on this survival rubric. MOSS
+called the rattlesnake cicadas; both local models understated owl predation risk.
+Flamingo's wolf-retreat flag is debatable, but removing it would only raise its
+composite to +0.05. See [audio configuration and caveats](RESULTS.md#september-6-audio-evaluation).
+
 Previous text, vision, audio, frontier, and local-hardware results are preserved
 in **[ARCHIVE.md](ARCHIVE.md)**. They are historical evidence, not an active rerun
 queue. Detailed current results are in **[RESULTS.md](RESULTS.md)**.
 
 ### Next evaluations
 
-The four requested additions are complete. Remaining optional work:
+The four requested text additions and the three-model audio batch have been
+evaluated. Remaining optional work:
 
 | Candidate | What it adds | Access |
 |---|---|---|
 | LFM2.5-2.6B / VL-3B | Tiny text and vision models for a low-memory tier | Text on OpenRouter; vision needs another route |
-| MOSS Audio 4B Thinking + Audio Flamingo Next | Environmental-sound understanding for the seven-question audio bench | Local setup; Mac runtime validation needed |
-| Gemini 3.8 Flash | Fresh hosted audio reference | OpenRouter; not a laptop-weight candidate |
+| MOSS Audio 8B or another local audio candidate | Seek better completion and survival advice than the tested local models | Runtime validation needed; 8B community port has known non-speech caveats |
 
 [Candidate sources and local-fit qualifications](RESULTS.md#candidate-sources-and-remaining-evaluations)
-are maintained with the detailed results. Audio has no active-cohort score yet;
-the current two headline models accept no audio. The separate
-[audio research shortlist](AUDIO_CANDIDATES.md) explains the recommendations,
-including the limitations of the MOSS 8B community port. A local quantized Muse
+are maintained with the detailed results. The separate
+[audio research and outcomes](AUDIO_CANDIDATES.md) records the tested candidates
+and the limitations of the MOSS 8B community port. A local quantized Muse
 run and a thinking-enabled Qwen3.8 run would answer additional configuration
 questions. Archived models do not need to be rerun to keep this cohort current.
 

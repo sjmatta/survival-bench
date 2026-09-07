@@ -175,6 +175,97 @@ feasibility but also shows the dense model's latency cost in this setup.
 Artifacts, source revisions, generation and judge settings, raw receipts, and
 audits are in the ignored `results-local-current-2026-09-06/` directory.
 
+## September 6 audio evaluation
+
+The current audio batch used the original seven questions and exact referenced
+recordings. Gemini is a hosted reference; MOSS and Audio Flamingo ran on the
+36 GB M4 Max. All use the same Opus 5 criterion judge as the text cohort.
+
+| Model / configuration | Completed | Composite | Correctness | Violations | Bonus | Negative questions |
+|---|---:|---:|---:|---:|---:|---:|
+| Gemini 3.8 Flash, OpenRouter, low reasoning | 7/7 | +0.83 | 76% | 0 | 29% | 0 |
+| Audio Flamingo Next, local BF16 | 7/7 | −0.02 | 18% | 3 | 5% | 3 |
+| MOSS Audio 4B Thinking, local MLX INT4 | 6/7 | — | — | — | — | — |
+
+**MOSS partial coverage:** the six completed answers alone score −0.17 composite,
+17% correctness, 4 violation flags, 0% bonus, and 4 negative questions. The wolf
+answer hit 4,096 tokens inside repetitive thinking with no final answer. Its
+unfinished reasoning was not graded, and the conditional six-question score
+must not be ranked against the full seven-question scores.
+
+### Findings and interpretation
+
+Gemini provided the strongest answers in this batch. MOSS misidentified the
+rattlesnake as cicadas and dismissed its significance. Audio Flamingo recognized
+the rattlesnake but called the very short coyote clip rustling leaves and
+interpreted the chickadee clip as wing movement. Both local models understated
+the owl's risk to pets or poultry. Their answers also frequently omitted the
+rubric's practical precautions, so these scores measure identification plus
+survival advice, not audio recognition alone.
+
+One Flamingo violation flag is debatable: the judge interpreted its suggestion
+to wait for the howling to stop and then slowly retreat as fleeing through the
+forest at night. The original answer does not explicitly advise running.
+Published figures preserve the judge's verdict; removing that one flag would
+raise its composite from −0.024 to +0.048, leaving the overall conclusion intact.
+MOSS's thunder flag concerns an incorrect mile/kilometer equivalence even though
+its approximate kilometer estimate and recommendation to seek shelter were useful.
+
+This remains a seven-clip toy benchmark with one answer per model/question.
+The coyote clip is less than a second long. The thunder prompt already reveals
+the sound and timing, so it scarcely tests listening. Model-specific decoding,
+quantization, and runtime differences also prevent treating this as a controlled
+comparison of underlying weights. Neither tested local configuration earns a
+strong recommendation for this survival workload from these results.
+
+### Configuration and verification
+
+- **Gemini:** `google/gemini-3.8-flash` on OpenRouter, default provider routing,
+  temperature 0.3, low reasoning, 4,096 output-token cap.
+- **MOSS:** `RumiLabs/MOSS-Audio-4B-Thinking-MLX-4bit`, revision
+  `35d32584136a619f3d4be37daaf3050b825202ec`. The LLM and audio path use INT4.
+  Temperature 1.0, top-p 1.0, top-k 50, repetition penalty 1.02 over 20 tokens,
+  seed 42, and 4,096 output-token cap. This follows the port's sampling defaults.
+  An initial temperature-0.3 smoke attempt looped and was excluded before choosing
+  the final configuration. With final settings, the rattlesnake completed, but
+  the wolf still looped; that failure was retained without repeated retries.
+  Peak MLX memory was approximately 4 GB including the failed attempt.
+- **MOSS prompt integration:** the port's example hard-codes an audio-captioning
+  prompt. The run wrapper instead passes the unchanged benchmark system message
+  and question through the supplied chat template, preserving the audio encoder,
+  time markers, feature injection, and Qwen tokenizer. A Transformers warning
+  incorrectly matched the local Qwen configuration to a Mistral-specific regex
+  check; the Mistral rewrite was explicitly disabled. Final text is extracted
+  after a closing thinking marker; incomplete thinking is not a final answer.
+- **Audio Flamingo:** `nvidia/audio-flamingo-next-hf`, revision
+  `5634886e2615c2f587dcf8b93c6edfe9907930ca`, BF16 on PyTorch MPS with eager
+  attention. The actual checkpoint selects `MusicFlamingoForConditionalGeneration`
+  and `MusicFlamingoProcessor`; these differ from the class names on its card.
+  Temperature 0.3, repetition penalty 1.2, seed 42, 4,096 output-token cap,
+  and generation cache enabled. Its rotary-time operation requires float64,
+  which Metal cannot represent. The wrapper runs that original operation on CPU
+  and transfers the result back, preserving its math; exact wrapper parity was
+  checked. The main model remains on Metal. Seven responses took about 85.5
+  seconds total, excluding model loading.
+
+Original recordings were downloaded from Wikimedia and xeno-canto, processed
+with the existing benchmark's <=20-second MP3 conversion, and hashed. Gemini
+received those MP3 bytes; local models received mono 16 kHz WAV decoded from the
+same MP3s. No ground truth, species labels, or source names were included in
+model prompts. The generation audit matched every prompt, audio hash, and final
+answer to its receipt: Gemini 7/7 complete, Flamingo 7/7, MOSS 6/7.
+
+All **186 graded criteria** passed raw-verdict and score verification: 130 for
+the two complete models plus 56 for MOSS's completed-only analysis. Judge settings
+remain Opus 5, temperature 0, low reasoning, 2,048-token budget with an 8,192-token
+retry only if no valid final verdict is returned. Recorded API cost for this
+audio batch, including generation and judging, was approximately **$0.96**.
+
+Artifacts and pinned runtime dependencies are in ignored
+`results-audio-current-2026-09-06/`. MOSS's conditional analysis is isolated in
+`results-audio-moss-completed-only-2026-09-06/`, with an explicit partial-coverage
+warning. The original seven-question benchmark was not altered.
+
 ## Candidate sources and remaining evaluations
 
 Checked September 6, 2026 against model developers' cards and the live
@@ -225,9 +316,7 @@ All four requested additions are complete. Liquid's tiny text model remains
 optional. There is no need to rebenchmark the archived
 Qwen/Gemma generation to answer these questions.
 
-The remaining modality gap is audio. The separate
-[audio research](AUDIO_CANDIDATES.md) recommends MOSS 4B Thinking and Audio
-Flamingo Next, plus Gemini 3.8 Flash as a hosted reference. These are researched
-candidates; no new audio run has been performed. Archived audio scores remain in
-[ARCHIVE.md](ARCHIVE.md); absence from the active leaderboard does not mean those
-experiments failed or their model families have all been superseded.
+The first current audio batch is complete above, including MOSS's recorded
+completion failure. The [audio research and outcomes](AUDIO_CANDIDATES.md)
+retain alternatives and source links. Archived audio scores remain in
+[ARCHIVE.md](ARCHIVE.md); no historical generation or grading was rerun.

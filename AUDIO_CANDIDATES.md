@@ -1,27 +1,30 @@
 # Audio evaluation candidates — September 6, 2026
 
-Research only; no audio benchmarks have been run for this cohort. The existing
+The first three-model batch has now been evaluated; see [detailed results](RESULTS.md#september-6-audio-evaluation). The existing
 seven-question set covers rattlesnakes, canids, bird alarm calls, thunder, and an
 owl. Environmental-sound understanding matters more here than transcription.
 Archived audio results remain in [ARCHIVE.md](ARCHIVE.md).
 
-## Recommended batch
+## First batch and outcome
 
-**MOSS-Audio-4B-Thinking + Audio Flamingo Next**, with **Gemini 3.8 Flash** as a
-fresh hosted ceiling. Add MOSS 8B Thinking as a higher-capacity challenger after
-checking that its local implementation handles non-speech inputs correctly.
+**Gemini 3.8 Flash scored +0.83 on 7/7 questions. Audio Flamingo Next scored
+−0.02 on 7/7. MOSS 4B Thinking completed 6/7; its completed-only composite was
+−0.17, with the wolf answer stuck in a thinking loop.** These results do not
+support recommending either tested local configuration for this survival
+workload. MOSS 8B remains an optional challenger, subject to its known non-speech
+runtime caveats; it was not part of this batch.
 
 | Candidate | Release | Input → output | Local feasibility / serving |
 |---|---|---|---|
-| `OpenMOSS-Team/MOSS-Audio-4B-Thinking` | April 13, 2026 | Audio + text → text | Approximately 4.6B total including encoder. Community MLX 4-bit port reports 3.8 GB transient peak on M3 Ultra; ample room on 36 GB, but untested here. Not in checked OpenRouter catalog. |
-| `nvidia/audio-flamingo-next-hf` | April 13, 2026 | Audio + text → text | 8B total; approximately 16 GB BF16 weights before overhead. Official Transformers implementation; Mac acceleration unverified. No checked OpenRouter/HF Inference Provider deployment. |
+| `OpenMOSS-Team/MOSS-Audio-4B-Thinking` | April 13, 2026 | Audio + text → text | Approximately 4.6B total including encoder. Community MLX 4-bit port reports 3.8 GB transient peak on M3 Ultra; ample room on 36 GB, approximately 4 GB observed here, with 6/7 completed answers. Not in checked OpenRouter catalog. |
+| `nvidia/audio-flamingo-next-hf` | April 13, 2026 | Audio + text → text | 8B total; approximately 16 GB BF16 weights before overhead. Official Transformers implementation; completed here on Metal with the original float64 timing operation on CPU. No checked OpenRouter/HF Inference Provider deployment. |
 | `OpenMOSS-Team/MOSS-Audio-8B-Thinking` | April 13, 2026 | Audio + text → text | Approximately 8.6B total. Community hybrid MLX port reports 8.1 GB transient peak, but also non-speech degeneration; its author recommends 4B for ambient audio. Not in checked OpenRouter catalog. |
 | `google/gemini-3.8-flash` | September 2, 2026 | Audio/text/images/video/files → text | OpenRouter available. Hosted ceiling only; no downloadable laptop weights. |
 
 The MOSS family and Audio Flamingo Next explicitly cover speech, environmental
 sounds, and music. Their published capabilities make them relevant candidates;
-none has a survival-bench score yet. Footprints reported by conversion authors
-are evidence from their hardware, not measurements on this laptop.
+the first three-model evaluation is summarized above. Published conversion
+footprints describe the authors' hardware unless explicitly marked as measured here.
 
 Sources: [MOSS original repository and release](https://github.com/OpenMOSS/MOSS-Audio),
 [MOSS 4B MLX runtime](https://huggingface.co/RumiLabs/MOSS-Audio-4B-Thinking-MLX-4bit),
