@@ -19,7 +19,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1.1",
-    "ruff>=0.16.5",
+    "ruff>=0.16.7",
     "poethepoet>=0.48.0",
     "pre-commit>=4.6.2",
 ]
