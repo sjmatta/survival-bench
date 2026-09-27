@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import http.client
 import json
 import os
@@ -190,7 +191,8 @@ def chat(
     elapsed = time.time() - t0
     if "choices" not in resp or not resp["choices"]:
         raise RuntimeError(f"no choices in response: {json.dumps(resp)[:300]}")
-    msg = resp["choices"][0]["message"]
+    choice = resp["choices"][0]
+    msg = choice["message"]
     text = msg.get("content") or ""
     used_reasoning = False
     if not text.strip():
@@ -205,6 +207,7 @@ def chat(
         "prompt_tokens": usage.get("prompt_tokens"),
         "completion_tokens": usage.get("completion_tokens"),
         "used_reasoning_field": used_reasoning,
+        "finish_reason": choice.get("finish_reason"),
     }
     return text, meta
 
@@ -392,6 +395,110 @@ def _result_dirs(args: argparse.Namespace) -> tuple[Path, Path]:
     return base / "answers", base / "judgments"
 
 
+CONFIG_KEYS = ("reasoning_effort", "max_tokens", "temperature", "provider_order", "samples")
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def build_run_config(args: argparse.Namespace, model: str, qpath: Path) -> dict:
+    """Run configuration for one model. Records the endpoint host only, never keys or full URLs."""
+    return {
+        "model": model,
+        "endpoint_host": urllib.parse.urlparse(args.base).hostname or "",
+        "reasoning_effort": getattr(args, "reasoning_effort", "") or "unset",
+        "max_tokens": args.max_tokens,
+        "temperature": args.temperature,
+        "provider_order": getattr(args, "provider_order", "") or "",
+        "samples": getattr(args, "samples", 1) or 1,
+        "label": getattr(args, "label", "") or "",
+        "questions_file": qpath.name,
+        "questions_sha256": file_sha256(qpath),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def write_manifest(manifests_dir: Path, config: dict) -> None:
+    """Write manifests/<model>.json; keep a history of runs and warn when the config changes."""
+    manifests_dir.mkdir(parents=True, exist_ok=True)
+    path = manifests_dir / f"{slug(config['model'])}.json"
+    runs = []
+    if path.exists():
+        prev = json.loads(path.read_text())
+        runs = prev.get("runs", [])
+        if runs and any(runs[-1].get(k) != config.get(k) for k in CONFIG_KEYS):
+            print(
+                f"WARNING: {config['model']} config differs from its previous run in this directory; "
+                "answers may mix configurations",
+                flush=True,
+            )
+    runs.append(config)
+    path.write_text(json.dumps({**config, "runs": runs}, indent=2))
+
+
+def load_run_configs(out_dir: Path) -> dict[str, dict]:
+    """Per-model run configs from manifests/, falling back to a legacy run-manifest.json."""
+    configs: dict[str, dict] = {}
+    legacy = out_dir / "run-manifest.json"
+    if legacy.exists():
+        try:
+            data = json.loads(legacy.read_text())
+        except json.JSONDecodeError:
+            data = {}
+        for m in data.get("models", []) if isinstance(data, dict) else []:
+            if isinstance(m, dict) and m.get("id"):
+                configs[m["id"]] = {
+                    "model": m["id"],
+                    "reasoning_effort": m.get("reasoning_effort") or "unset",
+                    "max_tokens": m.get("max_tokens"),
+                    "temperature": m.get("temperature", data.get("temperature")),
+                    "label": m.get("label", ""),
+                }
+    for mf in sorted((out_dir / "manifests").glob("*.json")):
+        rec = json.loads(mf.read_text())
+        if rec.get("model"):
+            configs[rec["model"]] = rec
+    return configs
+
+
+def config_mismatches(configs: list[dict]) -> list[str]:
+    """Describe fields that differ across the given run configs (empty list = comparable)."""
+    out = []
+    for key in ("reasoning_effort", "max_tokens", "temperature"):
+        vals = {c.get("model", "?"): c.get(key) for c in configs if c.get(key) is not None}
+        if len(set(map(str, vals.values()))) > 1:
+            out.append(f"{key}: " + ", ".join(f"`{m}`={v}" for m, v in vals.items()))
+    return out
+
+
+def is_truncated(ans: dict) -> bool:
+    """True if an answer hit the token cap or produced no final content."""
+    if ans.get("error"):
+        return False
+    return (
+        ans.get("finish_reason") == "length"
+        or not (ans.get("text") or "").strip()
+        or bool(ans.get("used_reasoning_field"))
+    )
+
+
+def format_config(cfg: dict | None) -> str:
+    if not cfg:
+        return "—"
+    parts = [f"reasoning={cfg.get('reasoning_effort', 'unset')}", f"max={cfg.get('max_tokens', '?')}"]
+    if cfg.get("label"):
+        parts.append(str(cfg["label"]))
+    return " / ".join(parts)
+
+
+def count_truncated(answers_path: Path) -> int | str:
+    if not answers_path.exists():
+        return "—"
+    record = json.loads(answers_path.read_text())
+    return sum(1 for ans in record.get("answers", {}).values() if is_truncated(ans))
+
+
 def cmd_generate(args: argparse.Namespace) -> None:
     qpath = Path(args.questions) if args.questions else QUESTIONS_PATH
     qdata = load_questions(qpath)
@@ -406,6 +513,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
     else:
         models = list_models(args.base, args.api_key)
     answers_dir.mkdir(parents=True, exist_ok=True)
+    for model in models:
+        write_manifest(answers_dir.parent / "manifests", build_run_config(args, model, qpath))
 
     print(f"Endpoint: {args.base}")
     print(f"Models ({len(models)}): {', '.join(models)}")
@@ -725,8 +834,9 @@ def cmd_report(args: argparse.Namespace) -> None:
     qdata = load_questions(qpath)
     questions = {q["id"]: q for q in qdata["questions"]}
     categories = sorted({q["category"] for q in qdata["questions"]})
-    _, judgments_dir = _result_dirs(args)
+    answers_dir, judgments_dir = _result_dirs(args)
     out_dir = judgments_dir.parent
+    configs = load_run_configs(out_dir)
 
     rows = []
     for jf in sorted(judgments_dir.glob("*.json")):
@@ -742,6 +852,18 @@ def cmd_report(args: argparse.Namespace) -> None:
     judge_models = {r.get("judge") for r in rows}
     out_lines.append(f"- Judge model(s): {', '.join(sorted(j for j in judge_models if j))}")
     out_lines.append("")
+    mismatches = config_mismatches([configs[r["model"]] for r in rows if r["model"] in configs])
+    if len([j for j in judge_models if j]) > 1:
+        mismatches.append("judge: " + ", ".join(f"`{r['model']}`={r.get('judge')}" for r in rows))
+    if mismatches:
+        out_lines.append("> ⚠️ **Config mismatch** — these models were not run under the same settings, so")
+        out_lines.append("> score differences may reflect configuration rather than the model:")
+        for mm in mismatches:
+            out_lines.append(f"> - {mm}")
+        out_lines.append("")
+        print("WARNING: config mismatch between compared models:", file=sys.stderr)
+        for mm in mismatches:
+            print(f"  - {mm}", file=sys.stderr)
     out_lines.append("**Scoring** — each question:")
     out_lines.append("- *Correctness* = fraction of `must_include` criteria satisfied")
     out_lines.append(
@@ -753,8 +875,10 @@ def cmd_report(args: argparse.Namespace) -> None:
 
     # --- Overall table ---
     out_lines.append("## Overall\n")
-    out_lines.append("| Model | Composite | Correctness | Safety viol. | Bonus | Q failed |")
-    out_lines.append("|---|---:|---:|---:|---:|---:|")
+    out_lines.append(
+        "| Model | Composite | Correctness | Safety viol. | Bonus | Q failed | Truncated/empty | Config |"
+    )
+    out_lines.append("|---|---:|---:|---:|---:|---:|---:|---|")
     summary = []
     for r in rows:
         scores = [j.get("score", {}) for j in r["judgments"].values() if j]
@@ -768,8 +892,18 @@ def cmd_report(args: argparse.Namespace) -> None:
         failed = sum(1 for s in scores if s.get("composite", 0) < 0)
         summary.append((r["model"], comp, corr, viols, bonus, failed, r))
     summary.sort(key=lambda x: x[1], reverse=True)
+    truncated = {m: count_truncated(answers_dir / f"{slug(m)}.json") for m, *_ in summary}
     for m, comp, corr, viols, bonus, failed, _ in summary:
-        out_lines.append(f"| `{m}` | {comp:+.2f} | {corr:.0%} | {viols} | {bonus:.0%} | {failed} |")
+        out_lines.append(
+            f"| `{m}` | {comp:+.2f} | {corr:.0%} | {viols} | {bonus:.0%} | {failed} "
+            f"| {truncated[m]} | {format_config(configs.get(m))} |"
+        )
+    out_lines.append("")
+    out_lines.append(
+        "_Truncated/empty counts answers with `finish_reason=length`, no final content, or a "
+        "reasoning-field fallback. Answers recorded before `finish_reason` was saved are counted "
+        "only when empty or fallback._"
+    )
     out_lines.append("")
 
     # --- Per category ---
@@ -848,7 +982,7 @@ def cmd_report(args: argparse.Namespace) -> None:
         "they are objective rule violations rather than judgment calls._\n"
     )
 
-    report_path = out_dir / "report.md"
+    report_path = Path(args.output) if getattr(args, "output", None) else out_dir / "report.md"
     report_path.write_text("\n".join(out_lines))
     print(f"wrote {report_path}")
 
@@ -888,6 +1022,9 @@ def main() -> None:
         default="",
         help="comma-separated OpenRouter providers to pin (e.g. 'DeepInfra'); empty = default routing",
     )
+    sp.add_argument(
+        "--label", default="", help="free-text run note recorded in the manifest (e.g. 'local Q4_K_M')"
+    )
     sp.set_defaults(func=cmd_generate)
 
     sp = sub.add_parser("judge", help="judge each answer with a judge model")
@@ -901,6 +1038,7 @@ def main() -> None:
     sp = sub.add_parser("report", help="produce results/report.md")
     sp.add_argument("--questions", help="path to questions file (default questions.json)")
     sp.add_argument("--out-dir", help="results directory (default ./results)")
+    sp.add_argument("--output", help="report path (default <out-dir>/report.md)")
     sp.set_defaults(func=cmd_report)
 
     sp = sub.add_parser(
@@ -931,6 +1069,7 @@ def main() -> None:
         choices=REASONING_EFFORT_CHOICES,
     )
     sp.add_argument("--provider-order", default="")
+    sp.add_argument("--label", default="")
     sp.set_defaults(func=cmd_all)
 
     args = p.parse_args()

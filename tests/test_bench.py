@@ -204,3 +204,99 @@ def test_naturelm_output_removes_window_timestamps():
     runner = _load_naturelm_runner()
     raw = "#0.00s - 10.00s#: Rattlesnake\n#10.00s - 20.00s#: Continue moving away.\n"
     assert runner.clean_naturelm_output(raw) == "Rattlesnake\nContinue moving away."
+
+
+# ─── run manifests & config comparison (P1) ──────────────────────────────
+
+
+def _gen_args(**overrides):
+    import argparse
+
+    base = dict(
+        base="https://user:secret@openrouter.ai/api/v1?key=abc",
+        reasoning_effort="",
+        max_tokens=8192,
+        temperature=0.3,
+        provider_order="",
+        samples=1,
+        label="local Q4_K_M",
+    )
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+def test_run_config_records_host_only(tmp_path):
+    qfile = tmp_path / "q.json"
+    qfile.write_text('{"questions": []}')
+    cfg = bench.build_run_config(_gen_args(), "meta/muse-glimmer-30b", qfile)
+    assert cfg["endpoint_host"] == "openrouter.ai"
+    assert "secret" not in json.dumps(cfg) and "key=abc" not in json.dumps(cfg)
+    assert cfg["reasoning_effort"] == "unset"
+    assert cfg["max_tokens"] == 8192
+    assert cfg["label"] == "local Q4_K_M"
+    assert len(cfg["questions_sha256"]) == 64
+
+
+def test_write_manifest_keeps_history_and_warns_on_change(tmp_path, capsys):
+    qfile = tmp_path / "q.json"
+    qfile.write_text('{"questions": []}')
+    mdir = tmp_path / "manifests"
+    bench.write_manifest(mdir, bench.build_run_config(_gen_args(), "m/a", qfile))
+    assert "WARNING" not in capsys.readouterr().out
+    bench.write_manifest(mdir, bench.build_run_config(_gen_args(max_tokens=4000), "m/a", qfile))
+    assert "WARNING" in capsys.readouterr().out
+    rec = json.loads((mdir / "m_a.json").read_text())
+    assert rec["max_tokens"] == 4000
+    assert [r["max_tokens"] for r in rec["runs"]] == [8192, 4000]
+
+
+def test_load_run_configs_legacy_fallback_and_manifest_precedence(tmp_path):
+    (tmp_path / "run-manifest.json").write_text(
+        json.dumps(
+            {
+                "temperature": 0.3,
+                "models": [
+                    {"id": "m/a", "reasoning_effort": "none", "max_tokens": 4000},
+                    {"id": "m/b", "reasoning_effort": "default", "max_tokens": 8192},
+                ],
+            }
+        )
+    )
+    configs = bench.load_run_configs(tmp_path)
+    assert configs["m/a"]["reasoning_effort"] == "none"
+    assert configs["m/b"]["temperature"] == 0.3
+    (tmp_path / "manifests").mkdir()
+    (tmp_path / "manifests" / "m_a.json").write_text(
+        json.dumps({"model": "m/a", "reasoning_effort": "medium", "max_tokens": 8192})
+    )
+    assert bench.load_run_configs(tmp_path)["m/a"]["reasoning_effort"] == "medium"
+
+
+def test_config_mismatches():
+    same = [
+        {"model": "a", "reasoning_effort": "medium", "max_tokens": 8192, "temperature": 0.3},
+        {"model": "b", "reasoning_effort": "medium", "max_tokens": 8192, "temperature": 0.3},
+    ]
+    assert bench.config_mismatches(same) == []
+    diff = [
+        {"model": "a", "reasoning_effort": "default", "max_tokens": 8192},
+        {"model": "b", "reasoning_effort": "none", "max_tokens": 4000},
+    ]
+    msgs = bench.config_mismatches(diff)
+    assert any(m.startswith("reasoning_effort") for m in msgs)
+    assert any(m.startswith("max_tokens") for m in msgs)
+
+
+@pytest.mark.parametrize(
+    "ans,expected",
+    [
+        ({"text": "ok", "finish_reason": "stop"}, False),
+        ({"text": "partial", "finish_reason": "length"}, True),
+        ({"text": "   "}, True),
+        ({"text": "thinking...", "used_reasoning_field": True}, True),
+        ({"text": "", "error": "HTTPError"}, False),
+        ({"text": "legacy answer without finish_reason"}, False),
+    ],
+)
+def test_is_truncated(ans, expected):
+    assert bench.is_truncated(ans) is expected
