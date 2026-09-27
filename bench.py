@@ -492,11 +492,40 @@ def format_config(cfg: dict | None) -> str:
     return " / ".join(parts)
 
 
+PENDING = "pending"
+SCORE_FIELDS = ("correctness", "bonus_rate", "safety_violations", "composite")
+
+
+def answer_samples(record: dict) -> dict[str, list[dict]]:
+    """Answers per question as a list indexed by sample. Legacy files hold one dict per question."""
+    return {qid: list(v) if isinstance(v, list) else [v] for qid, v in (record.get("answers") or {}).items()}
+
+
+def judgment_samples(entry: dict) -> list[dict]:
+    """Per-sample judgments for one question. A legacy entry is itself the single sample."""
+    if not entry:
+        return []
+    return list(entry["samples"]) if "samples" in entry else [entry]
+
+
+def aggregate_scores(scores: list[dict]) -> dict:
+    """Per-question score = mean of each field across samples (formula per sample is unchanged)."""
+    if len(scores) == 1:
+        return dict(scores[0])
+    n = len(scores)
+    return {f: round(sum(s.get(f, 0) for s in scores) / n, 3) for f in SCORE_FIELDS}
+
+
+def fmt_count(x: float) -> str:
+    """Violation counts are whole numbers with one sample and per-sample means otherwise."""
+    return str(int(x)) if float(x).is_integer() else f"{x:.1f}"
+
+
 def count_truncated(answers_path: Path) -> int | str:
     if not answers_path.exists():
         return "—"
     record = json.loads(answers_path.read_text())
-    return sum(1 for ans in record.get("answers", {}).values() if is_truncated(ans))
+    return sum(1 for samples in answer_samples(record).values() for ans in samples if is_truncated(ans))
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
@@ -523,36 +552,44 @@ def cmd_generate(args: argparse.Namespace) -> None:
     print()
 
     # Build pending work and per-model state
-    answers_by_model: dict[str, dict] = {}
+    n_samples = max(1, getattr(args, "samples", 1) or 1)
+    answers_by_model: dict[str, dict[str, list[dict]]] = {}
     paths: dict[str, Path] = {}
     locks: dict[str, threading.Lock] = {}
-    pending: list[tuple[str, dict]] = []
+    pending: list[tuple[str, dict, int]] = []
     for model in models:
         out_path = answers_dir / f"{slug(model)}.json"
         paths[model] = out_path
         locks[model] = threading.Lock()
         if out_path.exists() and args.resume:
-            existing = json.loads(out_path.read_text())
-            answers_by_model[model] = existing.get("answers", {})
+            answers_by_model[model] = answer_samples(json.loads(out_path.read_text()))
         else:
             answers_by_model[model] = {}
         for q in questions:
-            qid = q["id"]
-            cur = answers_by_model[model].get(qid)
-            if cur and not cur.get("error") and (cur.get("text") or "").strip():
-                continue
-            pending.append((model, q))
+            slots = answers_by_model[model].setdefault(q["id"], [])
+            while len(slots) < n_samples:
+                slots.append({"text": "", "error": PENDING})
+            for idx, cur in enumerate(slots):
+                if not cur.get("error") and (cur.get("text") or "").strip():
+                    continue
+                pending.append((model, q, idx))
 
     if not pending:
         print("nothing to do (all answers cached)")
         return
-    print(f"Pending: {len(pending)} (model, question) pairs")
+    print(f"Samples per question: {n_samples}")
+    print(f"Pending: {len(pending)} (model, question, sample) answers")
+
+    def write_answers(model: str) -> None:
+        paths[model].write_text(
+            json.dumps({"model": model, "format": 2, "answers": answers_by_model[model]}, indent=2)
+        )
 
     done = 0
     total = len(pending)
     start = time.time()
 
-    def work(model: str, q: dict) -> tuple[str, str, dict]:
+    def work(model: str, q: dict, idx: int) -> tuple[str, str, int, dict]:
         try:
             image_urls = [img["image_url"] for img in q.get("images", []) or [] if img.get("image_url")]
             audio_payload: list[tuple[str, str]] = []
@@ -581,25 +618,23 @@ def cmd_generate(args: argparse.Namespace) -> None:
                     or None
                 ),
             )
-            return model, q["id"], {"text": text, **meta, "error": None}
+            return model, q["id"], idx, {"text": text, **meta, "error": None}
         except Exception as e:
-            return model, q["id"], {"text": "", "error": f"{type(e).__name__}: {e}"}
+            return model, q["id"], idx, {"text": "", "error": f"{type(e).__name__}: {e}"}
 
     with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
-        futures = [ex.submit(work, m, q) for m, q in pending]
+        futures = [ex.submit(work, m, q, idx) for m, q, idx in pending]
         for fut in as_completed(futures):
-            model, qid, result = fut.result()
+            model, qid, idx, result = fut.result()
             with locks[model]:
-                answers_by_model[model][qid] = result
-                paths[model].write_text(
-                    json.dumps({"model": model, "answers": answers_by_model[model]}, indent=2)
-                )
+                answers_by_model[model][qid][idx] = result
+                write_answers(model)
             done += 1
             err = result.get("error")
             tag = (
                 f"ERROR {err}" if err else f"{result.get('elapsed_s')}s {result.get('completion_tokens')}tok"
             )
-            print(f"  [{done}/{total}] {model}  {qid}  {tag}", flush=True)
+            print(f"  [{done}/{total}] {model}  {qid}#{idx}  {tag}", flush=True)
 
     elapsed = time.time() - start
     print(f"\nDone in {elapsed:.1f}s")
@@ -681,6 +716,25 @@ def score_question(judgment: dict) -> dict:
     }
 
 
+CRITERION_TYPES = ("must_include", "must_not_include", "bonus")
+
+
+def sample_fully_judged(judgment: dict | None, expected: int) -> bool:
+    """A cached sample judgment can be reused if it has no error and every criterion present."""
+    if not judgment or judgment.get("error"):
+        return False
+    return sum(len(judgment.get(c, [])) for c in CRITERION_TYPES) >= expected
+
+
+def judgment_entry(slots: list[dict]) -> dict:
+    """Stored form of one question's judgments; the mean score appears once every sample is scored."""
+    entry: dict = {"samples": slots}
+    scores = [sl["score"] for sl in slots if "score" in sl]
+    if slots and len(scores) == len(slots):
+        entry["score"] = aggregate_scores(scores)
+    return entry
+
+
 def cmd_judge(args: argparse.Namespace) -> None:
     qpath = Path(args.questions) if args.questions else QUESTIONS_PATH
     qdata = load_questions(qpath)
@@ -698,12 +752,14 @@ def cmd_judge(args: argparse.Namespace) -> None:
         judge_model = ranked[0]
     print(f"Judge model: {judge_model}")
 
-    # Build the full task list across all models
-    judgments_by_model: dict[str, dict] = {}
+    # Build the full task list across all models. Each answer sample gets its own judgment
+    # slot, tagged with its sample index so results route back and resume stays aligned.
+    judgments_by_model: dict[str, dict[str, list[dict]]] = {}
+    slots_by_key: dict[tuple[str, str, int], dict] = {}
     out_paths: dict[str, Path] = {}
     locks: dict[str, threading.Lock] = {}
-    tasks: list[tuple[str, str, dict, str]] = []  # (model, qid, answer_text, criterion-key)
-    # criterion-key encodes type+index so we can route the result back
+    tasks: list[tuple[str, str, int, str, str, str]] = []  # (model, qid, sample, answer, ctype, criterion)
+    skipped_pending = 0
 
     for ans_file in sorted(answers_dir.glob("*.json")):
         record = json.loads(ans_file.read_text())
@@ -711,48 +767,52 @@ def cmd_judge(args: argparse.Namespace) -> None:
         out_path = judgments_dir / ans_file.name
         out_paths[model] = out_path
         locks[model] = threading.Lock()
+        existing: dict[str, dict] = {}
         if out_path.exists() and args.resume:
-            existing = json.loads(out_path.read_text())
-            if existing.get("judge") == judge_model:
-                judgments_by_model[model] = existing.get("judgments", {})
-            else:
-                judgments_by_model[model] = {}
-        else:
-            judgments_by_model[model] = {}
+            prev_file = json.loads(out_path.read_text())
+            if prev_file.get("judge") == judge_model:
+                existing = prev_file.get("judgments", {})
+        judgments_by_model[model] = {}
 
-        for qid, ans in record["answers"].items():
+        for qid, samples in answer_samples(record).items():
             q = questions.get(qid)
             if not q:
                 continue
-            if ans.get("error") or not ans.get("text"):
-                judgments_by_model[model][qid] = {
-                    "error": ans.get("error", "empty"),
-                    "must_include": [],
-                    "must_not_include": [],
-                    "bonus": [],
-                    "score": {
-                        "correctness": 0.0,
-                        "bonus_rate": 0.0,
-                        "safety_violations": 0,
-                        "composite": -1.0,
-                    },
-                }
-                continue
-            existing_j = judgments_by_model[model].get(qid)
-            if existing_j and not existing_j.get("error"):
-                # already fully judged — skip if all criteria present
-                expected = sum(len(q.get(c, [])) for c in ("must_include", "must_not_include", "bonus"))
-                actual = sum(
-                    len(existing_j.get(c, [])) for c in ("must_include", "must_not_include", "bonus")
-                )
-                if actual >= expected:
+            prev = {j.get("sample", 0): j for j in judgment_samples(existing.get(qid, {}))}
+            expected = sum(len(q.get(c, [])) for c in CRITERION_TYPES)
+            slots: list[dict] = []
+            for sidx, ans in enumerate(samples):
+                if ans.get("error") == PENDING:
+                    skipped_pending += 1
                     continue
-            # initialize empty slots
-            judgments_by_model[model][qid] = {"must_include": [], "must_not_include": [], "bonus": []}
-            for ctype in ("must_include", "must_not_include", "bonus"):
-                for idx, crit in enumerate(q.get(ctype, [])):
-                    tasks.append((model, qid, ans["text"], f"{ctype}|{idx}|{crit}"))
+                if ans.get("error") or not ans.get("text"):
+                    slot = {
+                        "sample": sidx,
+                        "error": ans.get("error", "empty"),
+                        "must_include": [],
+                        "must_not_include": [],
+                        "bonus": [],
+                        "score": {
+                            "correctness": 0.0,
+                            "bonus_rate": 0.0,
+                            "safety_violations": 0,
+                            "composite": -1.0,
+                        },
+                    }
+                elif sample_fully_judged(prev.get(sidx), expected):
+                    slot = {"sample": sidx, **prev[sidx]}
+                else:
+                    slot = {"sample": sidx, "must_include": [], "must_not_include": [], "bonus": []}
+                    for ctype in CRITERION_TYPES:
+                        for crit in q.get(ctype, []):
+                            tasks.append((model, qid, sidx, ans["text"], ctype, crit))
+                slots.append(slot)
+                slots_by_key[(model, qid, sidx)] = slot
+            if slots:
+                judgments_by_model[model][qid] = slots
 
+    if skipped_pending:
+        print(f"WARNING: skipped {skipped_pending} answer samples still pending generation")
     if not tasks:
         print("nothing to judge")
     else:
@@ -761,7 +821,12 @@ def cmd_judge(args: argparse.Namespace) -> None:
     def write(model: str) -> None:
         out_paths[model].write_text(
             json.dumps(
-                {"model": model, "judge": judge_model, "judgments": judgments_by_model[model]},
+                {
+                    "model": model,
+                    "judge": judge_model,
+                    "format": 2,
+                    "judgments": {qid: judgment_entry(sl) for qid, sl in judgments_by_model[model].items()},
+                },
                 indent=2,
             )
         )
@@ -772,8 +837,9 @@ def cmd_judge(args: argparse.Namespace) -> None:
         with locks[m]:
             write(m)
 
-    def judge_one(model: str, qid: str, answer_text: str, key: str) -> tuple[str, str, str, dict]:
-        ctype, _idx, crit = key.split("|", 2)
+    def judge_one(
+        model: str, qid: str, sidx: int, answer_text: str, ctype: str, crit: str
+    ) -> tuple[str, str, int, str, dict]:
         q = questions[qid]
         try:
             res = judge_response(
@@ -793,18 +859,17 @@ def cmd_judge(args: argparse.Namespace) -> None:
                 "reason": f"judge-error: {type(e).__name__}: {e}",
                 "raw": "",
             }
-        return model, qid, key, res
+        return model, qid, sidx, ctype, res
 
     done = 0
     total = len(tasks)
     start = time.time()
     with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
-        futures = [ex.submit(judge_one, m, qid, txt, key) for m, qid, txt, key in tasks]
+        futures = [ex.submit(judge_one, *t) for t in tasks]
         for fut in as_completed(futures):
-            model, qid, key, res = fut.result()
-            ctype, _idx, _crit = key.split("|", 2)
+            model, qid, sidx, ctype, res = fut.result()
             with locks[model]:
-                judgments_by_model[model][qid][ctype].append(res)
+                slots_by_key[(model, qid, sidx)][ctype].append(res)
             done += 1
             if done % 25 == 0 or done == total:
                 # flush all files periodically
@@ -813,12 +878,12 @@ def cmd_judge(args: argparse.Namespace) -> None:
                         write(m)
                 print(f"  [{done}/{total}] {time.time() - start:.0f}s elapsed", flush=True)
 
-    # finalize: compute scores per question, write
+    # finalize: compute scores per sample (and the per-question mean), write
     for model, judgments in judgments_by_model.items():
-        for j in judgments.values():
-            if "score" in j:
-                continue
-            j["score"] = score_question(j)
+        for slots in judgments.values():
+            for slot in slots:
+                if "score" not in slot:
+                    slot["score"] = score_question(slot)
         with locks[model]:
             write(model)
         print(f"  -> {out_paths[model]}")
@@ -895,7 +960,7 @@ def cmd_report(args: argparse.Namespace) -> None:
     truncated = {m: count_truncated(answers_dir / f"{slug(m)}.json") for m, *_ in summary}
     for m, comp, corr, viols, bonus, failed, _ in summary:
         out_lines.append(
-            f"| `{m}` | {comp:+.2f} | {corr:.0%} | {viols} | {bonus:.0%} | {failed} "
+            f"| `{m}` | {comp:+.2f} | {corr:.0%} | {fmt_count(viols)} | {bonus:.0%} | {failed} "
             f"| {truncated[m]} | {format_config(configs.get(m))} |"
         )
     out_lines.append("")
@@ -939,7 +1004,7 @@ def cmd_report(args: argparse.Namespace) -> None:
             viols = sum(
                 r["judgments"].get(qid, {}).get("score", {}).get("safety_violations", 0) for qid in qs_in_cat
             )
-            cells.append(str(viols))
+            cells.append(fmt_count(viols))
         out_lines.append("| " + " | ".join(cells) + " |")
     out_lines.append("")
 
@@ -949,9 +1014,12 @@ def cmd_report(args: argparse.Namespace) -> None:
     for m, *_, r in summary:
         per_model = []
         for qid, j in r["judgments"].items():
-            for crit in j.get("must_not_include", []):
-                if crit["verdict"] == "YES":
-                    per_model.append((qid, crit["criterion"], crit["reason"]))
+            samples = judgment_samples(j)
+            for sj in samples:
+                label = f"{qid} #{sj.get('sample', 0)}" if len(samples) > 1 else qid
+                for crit in sj.get("must_not_include", []):
+                    if crit["verdict"] == "YES":
+                        per_model.append((label, crit["criterion"], crit["reason"]))
         if per_model:
             any_viol = True
             out_lines.append(f"### `{m}`\n")
@@ -1025,6 +1093,7 @@ def main() -> None:
     sp.add_argument(
         "--label", default="", help="free-text run note recorded in the manifest (e.g. 'local Q4_K_M')"
     )
+    sp.add_argument("--samples", type=int, default=1, help="answers per question (scores average them)")
     sp.set_defaults(func=cmd_generate)
 
     sp = sub.add_parser("judge", help="judge each answer with a judge model")
@@ -1070,6 +1139,7 @@ def main() -> None:
     )
     sp.add_argument("--provider-order", default="")
     sp.add_argument("--label", default="")
+    sp.add_argument("--samples", type=int, default=1)
     sp.set_defaults(func=cmd_all)
 
     args = p.parse_args()

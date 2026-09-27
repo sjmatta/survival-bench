@@ -300,3 +300,157 @@ def test_config_mismatches():
 )
 def test_is_truncated(ans, expected):
     assert bench.is_truncated(ans) is expected
+
+
+# ─── multi-sample generation & judging (P2) ──────────────────────────────
+
+MINI_QUESTIONS = {
+    "questions": [
+        {
+            "id": "q1",
+            "category": "water",
+            "prompt": "Is creek water safe?",
+            "must_include": ["Boil it"],
+            "must_not_include": ["Say it is safe untreated"],
+            "bonus": ["Mention filters"],
+        },
+        {
+            "id": "q2",
+            "category": "fire",
+            "prompt": "How do I start a fire?",
+            "must_include": ["Use tinder", "Build up gradually"],
+            "must_not_include": ["Suggest gasoline"],
+            "bonus": [],
+        },
+    ]
+}
+
+
+class FakeEndpoint:
+    """Stand-in for bench.chat: numbered candidate answers; judge says YES to must_include only."""
+
+    def __init__(self):
+        self.calls = {"generate": 0, "judge": 0}
+
+    def __call__(self, base, model, system, user, **kw):
+        meta = {"elapsed_s": 0.0, "prompt_tokens": 1, "completion_tokens": 1}
+        meta |= {"used_reasoning_field": False, "finish_reason": "stop"}
+        if system == bench.JUDGE_SYSTEM:
+            self.calls["judge"] += 1
+            return ("YES: ok" if "CRITERION TYPE: must_include" in user else "NO: ok"), meta
+        self.calls["generate"] += 1
+        return f"answer {self.calls['generate']}", meta
+
+
+def _run_args(tmp_path, **overrides):
+    import argparse
+
+    qfile = tmp_path / "questions.json"
+    if not qfile.exists():
+        qfile.write_text(json.dumps(MINI_QUESTIONS))
+    base = dict(
+        questions=str(qfile),
+        out_dir=str(tmp_path / "results"),
+        models="m/a",
+        limit=0,
+        base="http://localhost:1234/v1",
+        api_key="",
+        temperature=0.3,
+        max_tokens=100,
+        concurrency=4,
+        resume=True,
+        reasoning_effort="",
+        provider_order="",
+        label="",
+        samples=1,
+        judge_model="judge/x",
+        output=None,
+    )
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+def test_generate_and_judge_multiple_samples(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    args = _run_args(tmp_path, samples=3)
+    bench.cmd_generate(args)
+    record = json.loads((tmp_path / "results/answers/m_a.json").read_text())
+    assert record["format"] == 2
+    assert all(len(v) == 3 for v in record["answers"].values())
+    assert fake.calls["generate"] == 6
+
+    bench.cmd_judge(args)
+    assert fake.calls["judge"] == 3 * (3 + 3)  # 3 samples × (q1: 3 criteria + q2: 3 criteria)
+    judged = json.loads((tmp_path / "results/judgments/m_a.json").read_text())["judgments"]
+    assert [s["sample"] for s in judged["q1"]["samples"]] == [0, 1, 2]
+    assert judged["q1"]["score"]["composite"] == pytest.approx(1.0)
+    assert judged["q2"]["score"]["correctness"] == pytest.approx(1.0)
+
+    # resume: nothing regenerated or rejudged
+    bench.cmd_generate(args)
+    bench.cmd_judge(args)
+    assert fake.calls["generate"] == 6
+    assert fake.calls["judge"] == 18
+
+    bench.cmd_report(args)
+    report = (tmp_path / "results/report.md").read_text()
+    assert "| `m/a` | +1.00 | 100% | 0 |" in report
+
+
+def test_resume_extends_legacy_single_sample_files(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    answers = tmp_path / "results/answers"
+    answers.mkdir(parents=True)
+    (answers / "m_a.json").write_text(
+        json.dumps({"model": "m/a", "answers": {"q1": {"text": "legacy", "error": None}}})
+    )
+    bench.cmd_generate(_run_args(tmp_path, samples=2))
+    record = bench.answer_samples(json.loads((answers / "m_a.json").read_text()))
+    assert record["q1"][0]["text"] == "legacy"
+    assert len(record["q1"]) == 2 and len(record["q2"]) == 2
+    assert fake.calls["generate"] == 3
+
+
+def test_legacy_judgment_is_reused_on_resume(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    args = _run_args(tmp_path)
+    (tmp_path / "results/answers").mkdir(parents=True)
+    (tmp_path / "results/judgments").mkdir(parents=True)
+    (tmp_path / "results/answers/m_a.json").write_text(
+        json.dumps({"model": "m/a", "answers": {"q1": {"text": "boil it", "error": None}}})
+    )
+    legacy = {
+        "must_include": [{"criterion": "Boil it", "verdict": "YES", "reason": ""}],
+        "must_not_include": [{"criterion": "Say it is safe untreated", "verdict": "NO", "reason": ""}],
+        "bonus": [{"criterion": "Mention filters", "verdict": "NO", "reason": ""}],
+        "score": {"correctness": 1.0, "bonus_rate": 0.0, "safety_violations": 0, "composite": 1.0},
+    }
+    (tmp_path / "results/judgments/m_a.json").write_text(
+        json.dumps({"model": "m/a", "judge": "judge/x", "judgments": {"q1": legacy}})
+    )
+    bench.cmd_judge(args)
+    assert fake.calls["judge"] == 0
+    judged = json.loads((tmp_path / "results/judgments/m_a.json").read_text())["judgments"]["q1"]
+    assert judged["score"]["composite"] == 1.0
+
+
+def test_aggregate_scores_is_mean_of_samples():
+    agg = bench.aggregate_scores(
+        [
+            {"correctness": 1.0, "bonus_rate": 0.0, "safety_violations": 0, "composite": 1.0},
+            {"correctness": 0.5, "bonus_rate": 1.0, "safety_violations": 1, "composite": 0.25},
+        ]
+    )
+    assert agg == {"correctness": 0.75, "bonus_rate": 0.5, "safety_violations": 0.5, "composite": 0.625}
+    assert bench.fmt_count(4) == "4" and bench.fmt_count(2.5) == "2.5"
+
+
+def test_judgment_samples_normalizes_legacy_and_v2():
+    legacy = {"must_include": [], "score": {"composite": 1.0}}
+    assert bench.judgment_samples(legacy) == [legacy]
+    v2 = {"samples": [{"sample": 0}, {"sample": 1}], "score": {}}
+    assert bench.judgment_samples(v2) == v2["samples"]
+    assert bench.answer_samples({"answers": {"q": {"text": "x"}}}) == {"q": [{"text": "x"}]}
