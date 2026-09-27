@@ -9,6 +9,7 @@ import hashlib
 import http.client
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -894,6 +895,91 @@ def _size_hint(model: str) -> float:
     return float(m.group(1)) if m else 0.0
 
 
+BOOTSTRAP_RESAMPLES = 1000
+BOOTSTRAP_SEED = 20260906
+
+
+def question_composites(record: dict) -> dict[str, float]:
+    """Per-question composite (already the mean across samples) for one judgments file."""
+    return {qid: j.get("score", {}).get("composite", 0) for qid, j in record["judgments"].items() if j}
+
+
+def bootstrap_ci(
+    values: list[float],
+    *,
+    resamples: int = BOOTSTRAP_RESAMPLES,
+    seed: int = BOOTSTRAP_SEED,
+    alpha: float = 0.05,
+) -> tuple[float, float]:
+    """Percentile bootstrap CI for the mean, resampling values with replacement."""
+    if not values:
+        return (float("nan"), float("nan"))
+    rng = random.Random(seed)
+    k = len(values)
+    means = sorted(sum(rng.choices(values, k=k)) / k for _ in range(resamples))
+    lo = means[int(alpha / 2 * resamples)]
+    hi = means[min(resamples - 1, int((1 - alpha / 2) * resamples))]
+    return (lo, hi)
+
+
+def fmt_signed(x: float) -> str:
+    """Signed 2-dp value that never renders as '-0.00'."""
+    return "0.00" if round(x, 2) == 0 else f"{x:+.2f}"
+
+
+def fmt_ci(ci: tuple[float, float]) -> str:
+    return f"[{fmt_signed(ci[0])}, {fmt_signed(ci[1])}]"
+
+
+def paired_comparison(a: dict[str, float], b: dict[str, float], *, top: int = 5) -> dict:
+    """Paired per-question difference A − B over the questions both models completed."""
+    shared = sorted(set(a) & set(b))
+    diffs = {qid: a[qid] - b[qid] for qid in shared}
+    vals = list(diffs.values())
+    ranked = sorted(diffs.items(), key=lambda kv: kv[1], reverse=True)
+    return {
+        "n": len(shared),
+        "only_a": len(set(a) - set(b)),
+        "only_b": len(set(b) - set(a)),
+        "mean_diff": sum(vals) / len(vals) if vals else float("nan"),
+        "ci": bootstrap_ci(vals),
+        "wins": sum(1 for d in vals if round(d, 3) > 0),
+        "ties": sum(1 for d in vals if round(d, 3) == 0),
+        "losses": sum(1 for d in vals if round(d, 3) < 0),
+        "top_a": [kv for kv in ranked if round(kv[1], 3) > 0][:top],
+        "top_b": [kv for kv in reversed(ranked) if round(kv[1], 3) < 0][:top],
+    }
+
+
+def format_comparison(a: str, b: str, res: dict, questions: dict, mismatches: list[str]) -> list[str]:
+    lo, hi = res["ci"]
+    lines = [f"## Paired comparison: `{a}` − `{b}`\n"]
+    if mismatches:
+        lines.append("> ⚠️ **Config mismatch** — " + "; ".join(mismatches))
+        lines.append("")
+    lines.append(f"- Questions both completed: **{res['n']}**")
+    if res["only_a"] or res["only_b"]:
+        lines.append(f"- Excluded: {res['only_a']} only in `{a}`, {res['only_b']} only in `{b}`")
+    lines.append(
+        f"- Mean composite difference: **{fmt_signed(res['mean_diff'])}** {fmt_ci(res['ci'])} (95% CI)"
+    )
+    lines.append(f"- Win / tie / loss for `{a}`: {res['wins']} / {res['ties']} / {res['losses']}")
+    if lo <= 0 <= hi:
+        lines.append("- **Difference not distinguishable at this sample size** (the 95% CI includes 0).")
+    lines.append("")
+    for title, items in ((f"`{a}` ahead", res["top_a"]), (f"`{b}` ahead", res["top_b"])):
+        lines.append(f"**Largest differences — {title}**\n")
+        if not items:
+            lines.append("_None._\n")
+            continue
+        lines.append("| Question | Category | Difference |")
+        lines.append("|---|---|---:|")
+        for qid, d in items:
+            lines.append(f"| {qid} | {questions.get(qid, {}).get('category', '—')} | {d:+.2f} |")
+        lines.append("")
+    return lines
+
+
 def cmd_report(args: argparse.Namespace) -> None:
     qpath = Path(args.questions) if args.questions else QUESTIONS_PATH
     qdata = load_questions(qpath)
@@ -941,7 +1027,8 @@ def cmd_report(args: argparse.Namespace) -> None:
     # --- Overall table ---
     out_lines.append("## Overall\n")
     out_lines.append(
-        "| Model | Composite | Correctness | Safety viol. | Bonus | Q failed | Truncated/empty | Config |"
+        "| Model | Composite [95% CI] | Correctness | Safety viol. | Bonus | Q failed | Truncated/empty "
+        "| Config |"
     )
     out_lines.append("|---|---:|---:|---:|---:|---:|---:|---|")
     summary = []
@@ -958,11 +1045,17 @@ def cmd_report(args: argparse.Namespace) -> None:
         summary.append((r["model"], comp, corr, viols, bonus, failed, r))
     summary.sort(key=lambda x: x[1], reverse=True)
     truncated = {m: count_truncated(answers_dir / f"{slug(m)}.json") for m, *_ in summary}
-    for m, comp, corr, viols, bonus, failed, _ in summary:
+    for m, comp, corr, viols, bonus, failed, rec in summary:
         out_lines.append(
-            f"| `{m}` | {comp:+.2f} | {corr:.0%} | {fmt_count(viols)} | {bonus:.0%} | {failed} "
+            f"| `{m}` | {comp:+.2f} {fmt_ci(bootstrap_ci(list(question_composites(rec).values())))} "
+            f"| {corr:.0%} | {fmt_count(viols)} | {bonus:.0%} | {failed} "
             f"| {truncated[m]} | {format_config(configs.get(m))} |"
         )
+    out_lines.append("")
+    out_lines.append(
+        f"_95% CIs are percentile bootstraps over questions ({BOOTSTRAP_RESAMPLES} resamples, "
+        f"seed {BOOTSTRAP_SEED}); they reflect question sampling, not judge error._"
+    )
     out_lines.append("")
     out_lines.append(
         "_Truncated/empty counts answers with `finish_reason=length`, no final content, or a "
@@ -1043,6 +1136,22 @@ def cmd_report(args: argparse.Namespace) -> None:
         out_lines.append("| " + " | ".join(cells) + " |")
     out_lines.append("")
 
+    if getattr(args, "compare", None):
+        a, b = args.compare
+        by_model = {r["model"]: r for r in rows}
+        missing = [m for m in (a, b) if m not in by_model]
+        if missing:
+            sys.exit(f"--compare: no judgments for {', '.join(missing)}")
+        cmp_lines = format_comparison(
+            a,
+            b,
+            paired_comparison(question_composites(by_model[a]), question_composites(by_model[b])),
+            questions,
+            config_mismatches([configs[m] for m in (a, b) if m in configs]),
+        )
+        out_lines.extend(cmp_lines)
+        print("\n".join(cmp_lines))
+
     out_lines.append("---\n")
     out_lines.append(
         "_Note on judge bias: when the judge is one of the evaluated models, its own answers "
@@ -1108,6 +1217,12 @@ def main() -> None:
     sp.add_argument("--questions", help="path to questions file (default questions.json)")
     sp.add_argument("--out-dir", help="results directory (default ./results)")
     sp.add_argument("--output", help="report path (default <out-dir>/report.md)")
+    sp.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("A", "B"),
+        help="paired per-question comparison of model A against model B",
+    )
     sp.set_defaults(func=cmd_report)
 
     sp = sub.add_parser(

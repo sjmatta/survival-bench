@@ -395,7 +395,7 @@ def test_generate_and_judge_multiple_samples(tmp_path, monkeypatch):
 
     bench.cmd_report(args)
     report = (tmp_path / "results/report.md").read_text()
-    assert "| `m/a` | +1.00 | 100% | 0 |" in report
+    assert "| `m/a` | +1.00 [+1.00, +1.00] | 100% | 0 |" in report
 
 
 def test_resume_extends_legacy_single_sample_files(tmp_path, monkeypatch):
@@ -454,3 +454,60 @@ def test_judgment_samples_normalizes_legacy_and_v2():
     v2 = {"samples": [{"sample": 0}, {"sample": 1}], "score": {}}
     assert bench.judgment_samples(v2) == v2["samples"]
     assert bench.answer_samples({"answers": {"q": {"text": "x"}}}) == {"q": [{"text": "x"}]}
+
+
+# ─── bootstrap CIs & paired comparison (P3) ──────────────────────────────
+
+
+def test_bootstrap_ci_is_deterministic_and_brackets_mean():
+    vals = [1.0, 0.5, 0.75, -0.25, 1.25, 0.8, 0.9, 0.1]
+    ci = bench.bootstrap_ci(vals)
+    assert ci == bench.bootstrap_ci(vals)
+    assert ci[0] <= sum(vals) / len(vals) <= ci[1]
+    assert bench.bootstrap_ci([0.5] * 10) == (0.5, 0.5)
+
+
+def test_paired_comparison_uses_shared_questions_only():
+    a = {"q1": 1.0, "q2": 0.5, "q3": 0.0, "only_a": 1.0}
+    b = {"q1": 0.5, "q2": 0.5, "q3": 0.25, "only_b": 0.0}
+    res = bench.paired_comparison(a, b)
+    assert res["n"] == 3 and res["only_a"] == 1 and res["only_b"] == 1
+    assert res["mean_diff"] == pytest.approx((0.5 + 0 - 0.25) / 3)
+    assert (res["wins"], res["ties"], res["losses"]) == (1, 1, 1)
+    assert res["top_a"] == [("q1", 0.5)]
+    assert res["top_b"] == [("q3", -0.25)]
+
+
+def test_identical_models_are_not_distinguishable():
+    scores = {f"q{i}": i / 10 for i in range(10)}
+    res = bench.paired_comparison(scores, dict(scores))
+    assert res["ci"] == (0.0, 0.0)
+    lines = bench.format_comparison("a", "b", res, {}, [])
+    assert any("not distinguishable" in ln for ln in lines)
+
+
+def test_report_ci_is_computed_per_model(tmp_path):
+    out = tmp_path / "results"
+    (out / "judgments").mkdir(parents=True)
+    qfile = tmp_path / "q.json"
+    qs = [{"id": f"q{i}", "category": "c", "prompt": "p"} for i in range(6)]
+    qfile.write_text(json.dumps({"questions": qs}))
+
+    def write(model, comps):
+        judgments = {
+            f"q{i}": {"must_not_include": [], "score": {"composite": c, "correctness": 0.5}}
+            for i, c in enumerate(comps)
+        }
+        (out / "judgments" / f"{bench.slug(model)}.json").write_text(
+            json.dumps({"model": model, "judge": "j", "judgments": judgments})
+        )
+
+    write("m/high", [1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    write("m/low", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    args = _run_args(tmp_path, questions=str(qfile), out_dir=str(out), compare=["m/high", "m/low"])
+    bench.cmd_report(args)
+    report = (out / "report.md").read_text()
+    assert "| `m/high` | +1.00 [+1.00, +1.00]" in report
+    assert "| `m/low` | 0.00 [0.00, 0.00]" not in report  # composite column keeps its sign format
+    assert "| `m/low` | +0.00 [0.00, 0.00]" in report
+    assert "Paired comparison" in report and "not distinguishable" not in report
