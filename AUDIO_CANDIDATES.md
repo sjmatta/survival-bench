@@ -1,6 +1,6 @@
-# Audio evaluation candidates — September 6, 2026
+# Audio evaluation candidates — September 6–15, 2026
 
-The first three-model batch has now been evaluated; see [detailed results](RESULTS.md#september-6-audio-evaluation). The existing
+The first three-model batch has now been evaluated; see [detailed results](RESULTS.md#september-6-audio-evaluation). A separate [NatureLM-audio run](RESULTS.md#september-15-naturelm-audio-evaluation) completed on September 15. The existing
 seven-question set covers rattlesnakes, canids, bird alarm calls, thunder, and an
 owl. Environmental-sound understanding matters more here than transcription.
 Archived audio results remain in [ARCHIVE.md](ARCHIVE.md).
@@ -14,12 +14,19 @@ support recommending either tested local configuration for this survival
 workload. MOSS 8B remains an optional challenger, subject to its known non-speech
 runtime caveats; it was not part of this batch.
 
+**NatureLM-audio later completed 7/7 questions with composite −0.08, 13%
+correctness, 0% bonus, and 3 violation flags.** It identified the wolf, owl,
+crow alarm, and chickadee alarm coarsely, but misidentified the rattlesnake as
+a Plains Bush Cricket and the coyote as a Great Horned Owl. See the
+[detailed NatureLM run](RESULTS.md#september-15-naturelm-audio-evaluation).
+
 | Candidate | Release | Input → output | Local feasibility / serving |
 |---|---|---|---|
 | `OpenMOSS-Team/MOSS-Audio-4B-Thinking` | April 13, 2026 | Audio + text → text | Approximately 4.6B total including encoder. Community MLX 4-bit port reports 3.8 GB transient peak on M3 Ultra; ample room on 36 GB, approximately 4 GB observed here, with 6/7 completed answers. Not in checked OpenRouter catalog. |
 | `nvidia/audio-flamingo-next-hf` | April 13, 2026 | Audio + text → text | 8B total; approximately 16 GB BF16 weights before overhead. Official Transformers implementation; completed here on Metal with the original float64 timing operation on CPU. No checked OpenRouter/HF Inference Provider deployment. |
 | `OpenMOSS-Team/MOSS-Audio-8B-Thinking` | April 13, 2026 | Audio + text → text | Approximately 8.6B total. Community hybrid MLX port reports 8.1 GB transient peak, but also non-speech degeneration; its author recommends 4B for ambient audio. Not in checked OpenRouter catalog. |
 | `google/gemini-3.8-flash` | September 2, 2026 | Audio/text/images/video/files → text | OpenRouter available. Hosted ceiling only; no downloadable laptop weights. |
+| `EarthSpeciesProject/NatureLM-audio` | February 27, 2025; checkpoint updated May 27, 2025 | Audio + text → text | Bioacoustics specialist built around Llama 3.1 8B, BEATs, and an audio Q-Former. Official local PyTorch API, not OpenRouter; requires gated Meta-Llama 3.1 8B access. Evaluated here on the 36 GB M4 Max: 7/7 complete, composite −0.08, 13% correctness, 3 violation flags. |
 
 The MOSS family and Audio Flamingo Next explicitly cover speech, environmental
 sounds, and music. Their published capabilities make them relevant candidates;
@@ -31,7 +38,11 @@ Sources: [MOSS original repository and release](https://github.com/OpenMOSS/MOSS
 [MOSS 8B MLX runtime and limitations](https://huggingface.co/RumiLabs/MOSS-Audio-8B-Thinking-MLX-hybrid),
 [NVIDIA official checkpoint](https://huggingface.co/nvidia/audio-flamingo-next-hf),
 [Audio Flamingo Next paper](https://arxiv.org/abs/2604.10905),
-[Gemini OpenRouter endpoint](https://openrouter.ai/google/gemini-3.8-flash).
+[Gemini OpenRouter endpoint](https://openrouter.ai/google/gemini-3.8-flash),
+[NatureLM-audio repository](https://github.com/earthspecies/NatureLM-audio),
+[NatureLM-audio checkpoint](https://huggingface.co/EarthSpeciesProject/NatureLM-audio),
+[NatureLM-audio paper](https://openreview.net/forum?id=hJVdwBpWjt),
+[model-merging update](https://arxiv.org/abs/2511.05171).
 
 ## Alternatives and exclusions
 
@@ -64,6 +75,20 @@ listening; the other six clips carry most of the audio discrimination. Report th
 small sample size and judge sensitivity rather than treating small score gaps as
 precise rankings. Any local implementation must preserve the audio encoder,
 preprocessing, chat template, and final-answer extraction.
+
+NatureLM-audio has a dedicated local runner at
+[`scripts/run_naturelm_audio.py`](scripts/run_naturelm_audio.py). It calls the
+official sliding-window Python API, passes the unchanged benchmark system prompt
+and question, hashes the exact MP3 bytes, and writes standard `bench.py` answer
+and receipt files. Use `--merging-alpha` to record the checkpoint/base merge; the
+default `1.0` is the published NatureLM checkpoint. The upstream macOS CLI currently
+omits that required argument, so the runner intentionally bypasses the CLI.
+
+The model's official processor truncates each inference window to 10 seconds.
+With the default 10-second window and 10-second hop, most benchmark clips are
+therefore evaluated from their first 10 seconds; the exactly 20-second thunder
+clip receives two windows. This is an upstream model constraint, not a benchmark
+scoring rule, and should be noted alongside any NatureLM results.
 
 ## Context for the MOSS 8B warning
 

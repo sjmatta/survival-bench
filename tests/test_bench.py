@@ -176,3 +176,31 @@ def test_cli_accepts_all_openrouter_reasoning_efforts(command, monkeypatch):
         monkeypatch.setattr(sys, "argv", argv)
         bench.main()
         assert captured.pop().reasoning_effort == effort
+
+
+# ─── NatureLM-audio optional runner ──────────────────────────────────────
+
+
+def _load_naturelm_runner():
+    import importlib.util
+
+    path = ROOT / "scripts" / "run_naturelm_audio.py"
+    spec = importlib.util.spec_from_file_location("run_naturelm_audio", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_naturelm_query_includes_benchmark_system_prompt():
+    runner = _load_naturelm_runner()
+    question = {"prompt": "What animal made this sound?"}
+    query = runner.build_query(question)
+    assert query.startswith(bench.ANSWER_SYSTEM)
+    assert query.endswith("What animal made this sound?")
+
+
+def test_naturelm_output_removes_window_timestamps():
+    runner = _load_naturelm_runner()
+    raw = "#0.00s - 10.00s#: Rattlesnake\n#10.00s - 20.00s#: Continue moving away.\n"
+    assert runner.clean_naturelm_output(raw) == "Rattlesnake\nContinue moving away."

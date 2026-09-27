@@ -124,6 +124,16 @@ fetches them on demand to `audio_clips/`. You'll need:
 The runner trims each clip to ≤20 s mono 64 kbps mp3 — keeps them under
 OpenRouter's audio-input size limit and within reasonable token cost.
 
+For the local bioacoustics specialist, run
+[`scripts/run_naturelm_audio.py`](scripts/run_naturelm_audio.py) from a
+NatureLM-audio Python environment after resolving the clips. The optional runner
+uses the official upstream Python API, records MP3 hashes and generation receipts,
+and writes normal `bench.py` answers so the standard `judge` and `report`
+commands can score it. It requires gated Meta-Llama 3.1 8B access and a
+separate PyTorch environment; this repository remains stdlib-only. The upstream
+model processes 10-second windows, so shorter benchmark clips are evaluated from
+their first 10 seconds.
+
 ### Adding questions
 
 Source files: `questions.json` (wilderness), `calibration_questions.json`,
@@ -190,21 +200,25 @@ default reasoning and an 8,192-token cap. Muse and Qwen completed 45 text and
 Full configuration, judge-budget repair, and review caveats are in
 [RESULTS.md](RESULTS.md).
 
-**Current audio comparison — September 6, 2026** (Opus 5 judge):
+**Current audio comparison — September 6–15, 2026** (Opus 5 judge):
 
 | Model | Execution | Completed | Composite | Correctness | Violation flags |
 |---|---|---:|---:|---:|---:|
 | Gemini 3.8 Flash | OpenRouter; hosted reference | 7/7 | **+0.83** | 76% | 0 |
 | Audio Flamingo Next | Local BF16, Metal + CPU timing operation | 7/7 | −0.02 | 18% | 3 |
+| NatureLM-audio | Local PyTorch; MPS LLM + CPU audio encoder | 7/7 | −0.08 | 13% | 3 |
 | MOSS Audio 4B Thinking | Local MLX INT4 | 6/7 | — | — | — |
 
 MOSS's six completed answers scored **−0.17**, with 17% correctness and 4 flags;
 its wolf answer looped without a final response. That conditional score excludes
 the failed question and is not directly comparable to the full seven-question
-rows. Neither local candidate performed well on this survival rubric. MOSS
-called the rattlesnake cicadas; both local models understated owl predation risk.
+rows. None of the tested local configurations performed well on this survival
+rubric. MOSS called the rattlesnake cicadas; all three local models understated
+owl predation risk.
 Flamingo's wolf-retreat flag is debatable, but removing it would only raise its
-composite to +0.05. See [audio configuration and caveats](RESULTS.md#september-6-audio-evaluation).
+composite to +0.05. NatureLM-audio completed 7/7 on September 15 but scored
+−0.08, with 13% correctness and 3 flags; it misidentified the rattlesnake as a
+Plains Bush Cricket and the coyote as a Great Horned Owl. See [audio configuration and caveats](RESULTS.md#september-6-audio-evaluation) and [NatureLM-audio run](RESULTS.md#september-15-naturelm-audio-evaluation).
 
 Previous text, vision, audio, frontier, and local-hardware results are preserved
 in **[ARCHIVE.md](ARCHIVE.md)**. They are historical evidence, not an active rerun
@@ -212,8 +226,8 @@ queue. Detailed current results are in **[RESULTS.md](RESULTS.md)**.
 
 ### Next evaluations
 
-The four requested text additions and the three-model audio batch have been
-evaluated. Remaining optional work:
+The four requested text additions, the three-model audio batch, and
+NatureLM-audio have been evaluated. Remaining optional work:
 
 | Candidate | What it adds | Access |
 |---|---|---|

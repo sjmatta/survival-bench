@@ -266,6 +266,62 @@ Artifacts and pinned runtime dependencies are in ignored
 `results-audio-moss-completed-only-2026-09-06/`, with an explicit partial-coverage
 warning. The original seven-question benchmark was not altered.
 
+## September 15 NatureLM-audio evaluation
+
+The NatureLM-audio run used the same seven questions, exact MP3 bytes, and Opus 5
+criterion judge as the September 6 audio batch. It is a local bioacoustics
+specialist built around Llama 3.1 8B, BEATs, and an audio Q-Former.
+
+| Model / configuration | Completed | Composite | Correctness | Violations | Bonus | Negative questions |
+|---|---:|---:|---:|---:|---:|---:|
+| NatureLM-audio, local PyTorch MPS/CPU | 7/7 | −0.08 | 13% | 3 | 0% | 3 |
+
+### Findings and interpretation
+
+NatureLM completed every answer quickly and correctly identified the gray wolf,
+great horned owl, crow alarm behavior, and chickadee alarm behavior at a coarse
+level. It did not produce the benchmark's required practical survival advice,
+and its specialist identification was not sufficient to overcome those omissions.
+It misidentified the rattlesnake as a Plains Bush Cricket and the coyote as a
+Great Horned Owl. Its owl answer explicitly dismissed risk to pets or chickens.
+The thunder answer gave contradictory distances, including an incorrect
+five-mile estimate from a seven-second delay.
+
+The three violation flags were the rattlesnake cricket/insect trap, the thunder
+conversion error, and the owl predation-risk dismissal. No bonus criteria were
+satisfied. The score therefore reflects both bioacoustic identification and the
+benchmark's survival-advice requirements.
+
+### Configuration and verification
+
+- **Model:** `EarthSpeciesProject/NatureLM-audio`, checkpoint revision
+  `77855d9b0acd039f90798dcf0861f626bfefbd6f`, with
+  `meta-llama/Meta-Llama-3.1-8B-Instruct` base revision
+  `0e9e39f249a16976918f6564b8830bc894c89659`.
+- **Upstream source revision:** `c708df7a4cc294ca8d4aaf0498794b5674ce20b1`.
+- **Runtime:** PyTorch 2.2.2 on Apple MPS with the Llama model in float16.
+  PyTorch 2.2 does not implement BEATs' FFT path or bfloat16/autocast behavior
+  on MPS, so the audio encoder and Q-Former were kept on CPU and their embeddings
+  were transferred to the MPS Llama model. `PYTORCH_ENABLE_MPS_FALLBACK=1` was
+  set for remaining small unsupported MPS operations. The exact local runtime
+  patch is preserved in the ignored results directory.
+- **Generation:** official upstream Python API, unchanged benchmark system
+  message and question, 10-second window and hop, 300 output-token cap,
+  `merging_alpha=1.0`, seed 42. Generation took 39.4 seconds total, excluding
+  model loading.
+- **Audio constraint:** NatureLM's official processor truncates each inference
+  window to 10 seconds. With the default 10-second window and 10-second hop,
+  shorter clips are evaluated from their first 10 seconds; the 20-second
+  thunder clip receives two windows.
+- **Verification:** all seven answers, 65 judge criteria, and seven score
+  calculations were audited against exact prompts and MP3 hashes. Judge settings
+  were Opus 5, temperature 0, low reasoning, 2,048-token budget with an
+  8,192-token retry if no valid final verdict was returned. Recorded judge API
+  cost was approximately **$0.22**.
+
+Artifacts, receipts, the runtime patch, and the reproducibility manifest are in
+ignored `results-audio-naturelm-2026-09-15/`.
+
 ## Candidate sources and remaining evaluations
 
 Checked September 6, 2026 against model developers' cards and the live
@@ -311,6 +367,17 @@ alone does not establish runtime memory, speed, or backend compatibility.
    [Liquid release](https://www.liquid.ai/blog/lfm2-5-2-6b),
    [VL model card](https://huggingface.co/LiquidAI/LFM2.5-VL-3B),
    [OpenRouter text endpoint](https://openrouter.ai/liquid/lfm-2.5-2.6b:free).
+6. **NatureLM-audio — audio, evaluated September 15.** A bioacoustics specialist
+   built around Llama 3.1 8B, BEATs, and an audio Q-Former. It is not an
+   OpenRouter endpoint and requires gated Meta-Llama access plus a separate
+   PyTorch environment. The local runner at `scripts/run_naturelm_audio.py` uses
+   the official upstream Python API, preserves the benchmark system prompt, and
+   records MP3 hashes and receipts. The completed score is documented above.
+   Sources:
+   [NatureLM-audio repository](https://github.com/earthspecies/NatureLM-audio),
+   [checkpoint](https://huggingface.co/EarthSpeciesProject/NatureLM-audio),
+   [paper](https://openreview.net/forum?id=hJVdwBpWjt),
+   [model-merging update](https://arxiv.org/abs/2511.05171).
 
 All four requested additions are complete. Liquid's tiny text model remains
 optional. There is no need to rebenchmark the archived
