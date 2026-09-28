@@ -66,6 +66,64 @@ Sources: [MOSS original repository and release](https://github.com/OpenMOSS/MOSS
   Voxtral Small, and Gemma models. Catalog absence does not imply no possible
   private deployment.
 
+## Next candidates: September 27 literature review
+
+A multi-source review, with each claim checked by three independent votes, found
+no published evidence that any model clearly beats Gemini 3.8 Flash on these
+seven tasks. None of these candidates has been run on the benchmark. Most of the
+evidence comes from multiple-choice audio-reasoning benchmarks (MMAU, MMAR,
+MMAU-Pro), not from open-ended identification of wildlife or thunder in field
+clips, and most scores are vendor-reported.
+
+**Hosted-only:**
+
+1. **Gemini 3.x Pro.** It scores 79.8–81.1 on MMAU and 83.7 on MMAR. In the 2025
+   generation, Pro beat Flash on MMAR's Sound category by about 7 points. This
+   is the most direct measure of headroom over the Flash baseline.
+   [Qwen3.5-Omni report](https://arxiv.org/abs/2604.15804),
+   [MMAR leaderboard](https://github.com/ddlBoJack/MMAR).
+2. **Qwen3.5-Omni-Plus.** It has the top MMAU score (82.2) but trails Gemini Pro
+   on MMAR (80.0 vs 83.7). It is served only through the Alibaba DashScope API,
+   with no verified open weights.
+3. **An AudioToolAgent-style orchestrator.** A text LLM with no direct audio
+   access calls several audio models as tools and cross-checks their answers.
+   Its closed version beats GPT-4o Audio and Gemini 2.5 Pro on MMAU, MMAR and
+   MMAU-Pro. [Paper](https://arxiv.org/pdf/2510.02995).
+
+**Plausibly local (running on a 36 GB M4 Max is not yet verified):**
+
+1. **Qwen3-Omni-30B-A3B-Thinking.** It is the best open model on MMAR (66.4
+   overall, 57.6 Sound), with about 3B active parameters. Whether llama.cpp or
+   MLX accepts its audio input is unconfirmed.
+2. **A two-stage pipeline.** Classifiers identify the sound and pass labels and
+   confidences to a local text LLM that writes the advice:
+   - **BirdNET v2.4** has coyote, wolf and dog labels
+     ([wolf/coyote study](https://www.researchgate.net/publication/376031339_Using_the_BirdNET_algorithm_to_identify_wolves_coyotes_and_potentially_their_interactions_in_a_large_audio_dataset)).
+   - **Perch 2.0** covers birds, mammals, amphibians and insects, plus 198
+     FSD50K sound-event classes ([paper](https://arxiv.org/abs/2508.04665)).
+   - **A BEATs-style tagger** handles thunder. BEATs reaches 98.1% on ESC-50,
+     whose classes include thunderstorm.
+3. **Omni-R1 (8.4B).** It ties Gemini 2.5 Pro on MMAR's Sound category (67.3).
+
+**Risks that bear directly on this benchmark:**
+
+- **Rattlesnake:** none of the verified classifiers lists snakes or reptiles.
+  A pipeline would depend on the audio LLM for the rattle-vs-insect decision
+  that NatureLM-audio got wrong.
+- **Coyote vs wolf:** on wild audio, BirdNET's coyote predictions were over 95%
+  precise, but only 4 of 150 sampled wolf predictions were correct. Wind and
+  train horns caused most of the false positives.
+- **Clip length:** BirdNET and Perch use 3–5 s windows, while these clips run
+  up to 20 s, so long howls and thunder rumble need logic to combine windows.
+- **Licensing:** BirdNET is CC BY-NC-SA 4.0 (non-commercial). Licences for the
+  other candidates were not verified.
+
+**Suggested order:**
+
+1. Gemini Pro, to measure the headroom above Flash.
+2. Qwen3-Omni-30B locally.
+3. The two-stage pipeline.
+
 ## Run requirements
 
 Preserve the original seven questions. Verify attached audio bytes before scoring,

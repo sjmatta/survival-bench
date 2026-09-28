@@ -296,7 +296,7 @@ NatureLM-audio have been evaluated. Remaining optional work:
 |---|---|---|
 | Muse Glimmer 30B, local Q4_K_M | Whether quantization on the deployment laptop costs calibration relative to hosted Muse | Queued: `poe bench-muse-local` (commands in [RESULTS.md](RESULTS.md#next-evaluations-matched-muse-vs-qwen-comparison)) |
 | LFM2.5-2.6B / VL-3B | Tiny text and vision models for a low-memory tier | Text on OpenRouter; vision needs another route |
-| MOSS Audio 8B or another local audio candidate | Seek better completion and survival advice than the tested local models | Runtime validation needed; 8B community port has known non-speech caveats |
+| Gemini 3.x Pro, Qwen3-Omni-30B, or a BirdNET/Perch + LLM pipeline | Better audio identification than the tested local models; see the [Sept 27 literature review](AUDIO_CANDIDATES.md#next-candidates-september-27-literature-review) | Gemini Pro hosted; the others need local runtime validation |
 
 [Candidate sources and local-fit qualifications](RESULTS.md#candidate-sources-and-remaining-evaluations)
 are maintained with the detailed results. The separate
