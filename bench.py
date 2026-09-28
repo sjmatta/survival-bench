@@ -211,6 +211,12 @@ def chat(
         "used_reasoning_field": used_reasoning,
         "finish_reason": choice.get("finish_reason"),
     }
+    # Evidence for config comparisons: how much the model reasoned, and who served it (OpenRouter).
+    details = usage.get("completion_tokens_details") or {}
+    if details.get("reasoning_tokens") is not None:
+        meta["reasoning_tokens"] = details["reasoning_tokens"]
+    if resp.get("provider"):
+        meta["provider"] = resp["provider"]
     return text, meta
 
 

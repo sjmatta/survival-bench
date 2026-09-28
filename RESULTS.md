@@ -368,6 +368,44 @@ benchmark's survival-advice requirements.
 Artifacts, receipts, the runtime patch, and the reproducibility manifest are in
 ignored `results-audio-naturelm-2026-09-15/`.
 
+## Next evaluations: matched Muse vs Qwen comparison
+
+The Sept 6 Muse/Qwen gap (+0.07 paired, 95% CI [0.00, +0.15]) is not
+distinguishable at one sample per question, and the two models ran under
+different reasoning settings and token caps. These runs repeat the comparison
+with matched configuration, three samples per question, and one output
+directory, so `report --compare` pairs like with like. Every candidate uses
+`--reasoning-effort medium` and `--max-tokens 8192`. Muse's unset default
+cannot be observed, so it is pinned rather than guessed.
+
+```bash
+# 1. Qwen3.8-27B with thinking, and 2. hosted Muse Glimmer (OpenRouter)
+poe bench-qwen-thinking
+poe bench-muse-matched
+
+# 3. Local Q4_K_M Muse Glimmer on the 36 GB M4 Max (queued)
+hf download meta-models/Muse-Glimmer-30B-GGUF Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf \
+  --local-dir ~/models/muse-glimmer
+results-local-current-2026-09-06/llama-k2/build/bin/llama-server \
+  -m ~/models/muse-glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf \
+  --alias muse-glimmer-30b-q4_k_m --port 8080 -c 16384 -ngl 99 --jinja
+poe bench-muse-local
+
+# Judge (Opus 5.5 via claude -p on the logged-in account) and compare
+poe judge-matched
+poe report-matched   # Muse (hosted) vs Qwen
+python bench.py report --questions bench.json --out-dir results-matched-2026-09-27-text \
+  --output results-matched-2026-09-27-text/report-local.md \
+  --compare meta/muse-glimmer-30b muse-glimmer-30b-q4_k_m   # hosted vs local
+```
+
+The local run matters because the laptop is the deployment target, and
+quantization tends to hurt calibration first, so the hosted full-precision
+result may overstate it. `llama-server` may ignore the OpenRouter-style
+`reasoning.effort` field. The manifest records what was requested, and
+`reasoning_tokens` in the answers shows what happened. The `llama-k2` build
+above includes Muse Glimmer support.
+
 ## Candidate sources and remaining evaluations
 
 Checked September 6, 2026 against model developers' cards and the live

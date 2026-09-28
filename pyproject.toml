@@ -76,6 +76,38 @@ help = "Run the vision benchmark"
 cmd = "python bench.py all --questions audio_questions.json --out-dir results-audio --resume"
 help = "Run the audio benchmark"
 
+# ─── matched Muse vs Qwen comparison (RESULTS.md "Next evaluations") ───
+# Same reasoning effort, token cap and sample count for every candidate, one output dir,
+# one judge, so `report --compare` pairs like with like.
+
+[tool.poe.tasks.bench-qwen-thinking]
+cmd = """python bench.py generate --questions bench.json --out-dir results-matched-2026-09-27-text --resume
+  --models qwen/qwen3.8-27b --reasoning-effort medium --max-tokens 8192 --samples 3
+  --label 'hosted, thinking medium'"""
+help = "Qwen3.8-27B with thinking (effort medium), 8192-token cap, 3 samples"
+
+[tool.poe.tasks.bench-muse-matched]
+cmd = """python bench.py generate --questions bench.json --out-dir results-matched-2026-09-27-text --resume
+  --models meta/muse-glimmer-30b --reasoning-effort medium --max-tokens 8192 --samples 3
+  --label 'hosted, reasoning medium'"""
+help = "Muse Glimmer 30B, effort medium, 8192-token cap, 3 samples"
+
+[tool.poe.tasks.bench-muse-local]
+cmd = """python bench.py generate --questions bench.json --out-dir results-matched-2026-09-27-text --resume
+  --base http://localhost:8080/v1 --models muse-glimmer-30b-q4_k_m --reasoning-effort medium
+  --max-tokens 8192 --samples 3 --concurrency 1 --label 'local Q4_K_M'"""
+help = "Local Q4_K_M Muse Glimmer via llama-server on :8080 (see RESULTS.md for the server command)"
+
+[tool.poe.tasks.judge-matched]
+cmd = """python bench.py judge --questions bench.json --out-dir results-matched-2026-09-27-text --resume
+  --judge-backend claude-cli --judge-model claude-opus-5-5 --judge-reasoning-effort low --concurrency 6"""
+help = "Judge the matched runs with Opus 5.5 via claude -p on the logged-in Claude account"
+
+[tool.poe.tasks.report-matched]
+cmd = """python bench.py report --questions bench.json --out-dir results-matched-2026-09-27-text
+  --compare meta/muse-glimmer-30b qwen/qwen3.8-27b"""
+help = "Report the matched runs with the paired Muse vs Qwen comparison"
+
 [tool.poe.tasks.list-models]
 cmd = "python bench.py models"
 help = "List models exposed by the configured endpoint"

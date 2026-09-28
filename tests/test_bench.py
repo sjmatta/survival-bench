@@ -836,3 +836,21 @@ def test_cli_judge_label_keeps_backends_separate(tmp_path, monkeypatch):
     assert rec["judge_settings"]["backend"] == "claude-cli"
     assert rec["judge_settings"]["temperature"] is None
     assert len(calls) == 6  # API verdicts were not reused for the CLI judge
+
+
+def test_chat_records_finish_reason_reasoning_tokens_and_provider(monkeypatch):
+    resp = {
+        "provider": "DeepInfra",
+        "choices": [{"finish_reason": "stop", "message": {"content": "answer", "reasoning": "thoughts"}}],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 30,
+            "completion_tokens_details": {"reasoning_tokens": 20},
+        },
+    }
+    monkeypatch.setattr(bench, "http_post_json_retry", lambda *a, **k: resp)
+    text, meta = bench.chat("b", "m", "s", "u")
+    assert text == "answer"
+    assert meta["finish_reason"] == "stop"
+    assert meta["reasoning_tokens"] == 20
+    assert meta["provider"] == "DeepInfra"
