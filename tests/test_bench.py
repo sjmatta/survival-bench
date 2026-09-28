@@ -765,3 +765,74 @@ def test_judge_cli_defaults_reproduce_wrapper(monkeypatch):
         8192,
         "low",
     )
+
+
+# ─── claude-cli judge backend ────────────────────────────────────────────
+
+
+def _fake_claude_run(result="YES: covers it", stop="end_turn", returncode=0, is_error=False):
+    calls = []
+
+    def run(cmd, **kw):
+        import subprocess
+
+        calls.append({"cmd": cmd, **kw})
+        payload = {"result": result, "stop_reason": stop, "is_error": is_error, "usage": {"output_tokens": 3}}
+        return subprocess.CompletedProcess(cmd, returncode, stdout=json.dumps(payload), stderr="boom")
+
+    return run, calls
+
+
+def test_claude_cli_chat_isolates_context(monkeypatch):
+    run, calls = _fake_claude_run()
+    monkeypatch.setattr(bench.subprocess, "run", run)
+    text, meta = bench.claude_cli_chat("claude-opus-5-5", "SYSTEM", "USER", effort="low")
+    assert text == "YES: covers it" and meta["finish_reason"] == "stop"
+    cmd = calls[0]["cmd"]
+    assert cmd[:2] == ["claude", "-p"]
+    for flag, value in [
+        ("--model", "claude-opus-5-5"),
+        ("--system-prompt", "SYSTEM"),
+        ("--tools", ""),
+        ("--setting-sources", ""),
+        ("--effort", "low"),
+    ]:
+        assert cmd[cmd.index(flag) + 1] == value
+    assert "--no-session-persistence" in cmd and "--strict-mcp-config" in cmd
+    assert calls[0]["input"] == "USER"
+    assert Path(calls[0]["cwd"]) != ROOT  # never runs inside the repo (CLAUDE.md, memory)
+
+
+def test_claude_cli_judge_backend_and_invalid_on_errors(monkeypatch):
+    run, calls = _fake_claude_run()
+    monkeypatch.setattr(bench.subprocess, "run", run)
+    res = bench.judge_response("b", "claude-opus-5-5", "Q", "A", "must_include", "c", backend="claude-cli")
+    assert res["verdict"] == "YES" and len(calls) == 1
+
+    run, calls = _fake_claude_run(returncode=1)
+    monkeypatch.setattr(bench.subprocess, "run", run)
+    monkeypatch.setattr(bench.time, "sleep", lambda s: None)
+    res = bench.judge_response("b", "claude-opus-5-5", "Q", "A", "must_include", "c", backend="claude-cli")
+    assert res["verdict"] == bench.INVALID and len(calls) == 3
+
+    run, _ = _fake_claude_run(result="YES: cut off", stop="max_tokens")
+    monkeypatch.setattr(bench.subprocess, "run", run)
+    res = bench.judge_response("b", "claude-opus-5-5", "Q", "A", "must_include", "c", backend="claude-cli")
+    assert res["verdict"] == bench.INVALID
+
+
+def test_cli_judge_label_keeps_backends_separate(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    args = _run_args(tmp_path)
+    bench.cmd_generate(args)
+    bench.cmd_judge(args)  # api judge "judge/x"
+    run, calls = _fake_claude_run()
+    monkeypatch.setattr(bench.subprocess, "run", run)
+    cli_args = _run_args(tmp_path, judge_backend="claude-cli", judge_reasoning_effort="low")
+    bench.cmd_judge(cli_args)
+    rec = json.loads((tmp_path / "results/judgments/m_a.json").read_text())
+    assert rec["judge"] == "claude-cli:judge/x"
+    assert rec["judge_settings"]["backend"] == "claude-cli"
+    assert rec["judge_settings"]["temperature"] is None
+    assert len(calls) == 6  # API verdicts were not reused for the CLI judge

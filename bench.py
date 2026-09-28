@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -665,6 +666,61 @@ JUDGE_REASONING_EFFORT = "low"
 JUDGE_ATTEMPTS = 3  # first try plus up to two retries
 
 
+JUDGE_BACKENDS = ("api", "claude-cli")
+CLAUDE_CLI_EFFORTS = ("", "low", "medium", "high", "xhigh", "max")
+
+
+def claude_cli_chat(
+    model: str, system: str, user: str, *, effort: str = "", timeout: int = DEFAULT_TIMEOUT
+) -> tuple[str, dict]:
+    """One headless Claude Code call, billed to the logged-in Claude account.
+
+    No tools, no settings sources, no MCP servers, no saved session, and an empty working
+    directory, so no project CLAUDE.md or memory reaches the judge. Claude Code still appends
+    environment details to the system prompt, and there is no temperature control.
+    """
+    cmd = [
+        "claude",
+        "-p",
+        "--model",
+        model,
+        "--system-prompt",
+        system,
+        "--tools",
+        "",
+        "--output-format",
+        "json",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--setting-sources",
+        "",
+    ]
+    if effort:
+        cmd += ["--effort", effort]
+    t0 = time.time()
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+    if proc.returncode != 0:
+        raise RuntimeError(f"claude exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()[:300]}")
+    data = json.loads(proc.stdout)
+    if data.get("is_error"):
+        raise RuntimeError(f"claude error: {str(data.get('result'))[:300]}")
+    usage = data.get("usage") or {}
+    stop = data.get("stop_reason")
+    return data.get("result") or "", {
+        "elapsed_s": round(time.time() - t0, 2),
+        "prompt_tokens": sum(
+            usage.get(k) or 0
+            for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+        ),
+        "completion_tokens": usage.get("output_tokens"),
+        "used_reasoning_field": False,
+        "finish_reason": {"end_turn": "stop", "stop_sequence": "stop", "max_tokens": "length"}.get(
+            stop, stop
+        ),
+    }
+
+
 def parse_judge_verdict(text: str, meta: dict | None = None) -> tuple[str | None, str]:
     """Strict judge parsing: final content must start with 'YES:' or 'NO:' after a normal stop.
 
@@ -696,6 +752,7 @@ def judge_response(
     retry_max_tokens: int = JUDGE_RETRY_MAX_TOKENS,
     reasoning_effort: str = JUDGE_REASONING_EFFORT,
     attempts: int = JUDGE_ATTEMPTS,
+    backend: str = "api",
 ) -> dict:
     gt_block = (
         f"\nGROUND TRUTH (the actual species/condition shown — use to interpret criteria):\n{ground_truth}\n"
@@ -712,19 +769,25 @@ def judge_response(
     problem, text = "", ""
     for attempt in range(attempts):
         try:
-            text, meta = chat(
-                base,
-                judge_model,
-                JUDGE_SYSTEM,
-                user,
-                api_key=api_key,
-                temperature=0.0,
-                max_tokens=max_tokens if attempt == 0 else retry_max_tokens,
-                timeout=DEFAULT_TIMEOUT,
-                reasoning_effort=reasoning_effort,
-            )
+            if backend == "claude-cli":
+                # The CLI has no output cap or temperature knob; the effort level is passed through.
+                text, meta = claude_cli_chat(judge_model, JUDGE_SYSTEM, user, effort=reasoning_effort)
+            else:
+                text, meta = chat(
+                    base,
+                    judge_model,
+                    JUDGE_SYSTEM,
+                    user,
+                    api_key=api_key,
+                    temperature=0.0,
+                    max_tokens=max_tokens if attempt == 0 else retry_max_tokens,
+                    timeout=DEFAULT_TIMEOUT,
+                    reasoning_effort=reasoning_effort,
+                )
         except Exception as e:
             problem, text = f"judge-error: {type(e).__name__}: {e}", ""
+            if backend == "claude-cli" and attempt < attempts - 1:
+                time.sleep(5 * 2**attempt)  # subscription rate limits recover slowly
             continue
         verdict, reason = parse_judge_verdict(text, meta)
         if verdict:
@@ -888,17 +951,28 @@ def cmd_judge(args: argparse.Namespace) -> None:
         sys.exit(f"no answers directory at {answers_dir}; run generate first")
     judgments_dir.mkdir(parents=True, exist_ok=True)
 
+    backend = getattr(args, "judge_backend", "api") or "api"
+    effort = getattr(args, "judge_reasoning_effort", JUDGE_REASONING_EFFORT)
     judge_model = args.judge_model
+    if backend == "claude-cli":
+        if not judge_model:
+            sys.exit("--judge-backend claude-cli requires --judge-model (e.g. claude-opus-5-5)")
+        if effort not in CLAUDE_CLI_EFFORTS:
+            sys.exit(f"--judge-reasoning-effort {effort!r} is not supported by claude-cli")
     if not judge_model:
         models = list_models(args.base, args.api_key)
         # heuristic: pick the largest by parameter count token in the name
         ranked = sorted(models, key=lambda m: _size_hint(m), reverse=True)
         judge_model = ranked[0]
-    print(f"Judge model: {judge_model}")
+    # Judgments record which backend graded them, so API and CLI verdicts never mix on --resume
+    # and the report's judge-mismatch warning fires if they are compared.
+    judge_label = f"claude-cli:{judge_model}" if backend == "claude-cli" else judge_model
+    print(f"Judge model: {judge_label}")
+    args_judge_max = getattr(args, "judge_max_tokens", JUDGE_MAX_TOKENS)
+    args_judge_retry = getattr(args, "judge_retry_max_tokens", JUDGE_RETRY_MAX_TOKENS)
     print(
-        f"Judge settings: max_tokens={getattr(args, 'judge_max_tokens', JUDGE_MAX_TOKENS)}, "
-        f"retry_max_tokens={getattr(args, 'judge_retry_max_tokens', JUDGE_RETRY_MAX_TOKENS)}, "
-        f"reasoning_effort={getattr(args, 'judge_reasoning_effort', JUDGE_REASONING_EFFORT) or 'unset'}"
+        f"Judge settings: backend={backend}, max_tokens={args_judge_max}, "
+        f"retry_max_tokens={args_judge_retry}, reasoning_effort={effort or 'unset'}"
     )
 
     # Build the full task list across all models. Each answer sample gets its own judgment
@@ -919,7 +993,7 @@ def cmd_judge(args: argparse.Namespace) -> None:
         existing: dict[str, dict] = {}
         if out_path.exists() and args.resume:
             prev_file = json.loads(out_path.read_text())
-            if prev_file.get("judge") == judge_model:
+            if prev_file.get("judge") == judge_label:
                 existing = prev_file.get("judgments", {})
         judgments_by_model[model] = {}
 
@@ -972,7 +1046,14 @@ def cmd_judge(args: argparse.Namespace) -> None:
             json.dumps(
                 {
                     "model": model,
-                    "judge": judge_model,
+                    "judge": judge_label,
+                    "judge_settings": {
+                        "backend": backend,
+                        "reasoning_effort": effort or "unset",
+                        "max_tokens": None if backend == "claude-cli" else args_judge_max,
+                        "retry_max_tokens": None if backend == "claude-cli" else args_judge_retry,
+                        "temperature": None if backend == "claude-cli" else 0.0,
+                    },
                     "format": 2,
                     "judgments": {qid: judgment_entry(sl) for qid, sl in judgments_by_model[model].items()},
                 },
@@ -1000,9 +1081,10 @@ def cmd_judge(args: argparse.Namespace) -> None:
                 crit,
                 api_key=args.api_key,
                 ground_truth=q.get("ground_truth", ""),
-                max_tokens=getattr(args, "judge_max_tokens", JUDGE_MAX_TOKENS),
-                retry_max_tokens=getattr(args, "judge_retry_max_tokens", JUDGE_RETRY_MAX_TOKENS),
-                reasoning_effort=getattr(args, "judge_reasoning_effort", JUDGE_REASONING_EFFORT),
+                max_tokens=args_judge_max,
+                retry_max_tokens=args_judge_retry,
+                reasoning_effort=effort,
+                backend=backend,
             )
         except Exception as e:
             res = {
@@ -1417,6 +1499,12 @@ def main() -> None:
         choices=REASONING_EFFORT_CHOICES,
         help="reasoning.effort sent to the judge; empty = no reasoning field",
     )
+    sp.add_argument(
+        "--judge-backend",
+        default="api",
+        choices=JUDGE_BACKENDS,
+        help="api = OpenAI-compatible endpoint; claude-cli = headless `claude -p` on your Claude account",
+    )
     sp.set_defaults(func=cmd_judge)
 
     sp = sub.add_parser("report", help="produce results/report.md")
@@ -1478,6 +1566,12 @@ def main() -> None:
         default=JUDGE_REASONING_EFFORT,
         choices=REASONING_EFFORT_CHOICES,
         help="reasoning.effort sent to the judge; empty = no reasoning field",
+    )
+    sp.add_argument(
+        "--judge-backend",
+        default="api",
+        choices=JUDGE_BACKENDS,
+        help="api = OpenAI-compatible endpoint; claude-cli = headless `claude -p` on your Claude account",
     )
     sp.set_defaults(func=cmd_all)
 

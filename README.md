@@ -105,6 +105,17 @@ Pass the judge with `poe bench-text --judge-model anthropic/claude-opus-5`
 (extra arguments are appended to the poe command). See
 [configuration and verification](RESULTS.md#configuration-and-verification).
 
+`--judge-backend claude-cli --judge-model claude-opus-5-5` grades with headless
+`claude -p` calls on your logged-in Claude account instead of an API key. Each
+call runs in an empty temporary directory with no tools, settings sources, MCP
+servers or saved session, so no project CLAUDE.md or memory reaches the judge.
+Claude Code still appends environment details (OS, date) and a short account
+context block, and exposes no temperature or output-cap control; the effort
+level is passed through. Judgments are labeled `claude-cli:<model>` and never mix
+with API verdicts on `--resume`; comparing the two triggers the report's
+judge-mismatch warning. Use a modest `--concurrency` (4–8) to stay within
+subscription rate limits.
+
 `generate` writes `manifests/<model>.json` with the run configuration (endpoint
 host, reasoning effort, token cap, temperature, samples, and an optional
 `--label` such as `local Q4_K_M`). `--samples N` draws N answers per question;
