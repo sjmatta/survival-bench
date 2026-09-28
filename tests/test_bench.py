@@ -43,9 +43,14 @@ def test_question_schema(filename):
         assert not missing, f"{filename}::{q.get('id', '?')} missing keys: {missing}"
         assert q["id"] not in seen_ids, f"duplicate id in {filename}: {q['id']}"
         seen_ids.add(q["id"])
-        for ctype in ("must_include", "must_not_include", "bonus"):
+        for ctype in ("must_include", "bonus"):
             assert isinstance(q[ctype], list)
             assert all(isinstance(c, str) and c.strip() for c in q[ctype])
+        assert isinstance(q["must_not_include"], list)
+        for c in q["must_not_include"]:
+            assert isinstance(c, str) or set(c) <= {"text", "kind"}, f"{q['id']}: bad keys {c}"
+            assert bench.criterion_text(c).strip()
+            assert bench.criterion_kind(c) in bench.VIOLATION_KINDS
 
 
 def test_no_secrets_in_questions():
@@ -511,3 +516,74 @@ def test_report_ci_is_computed_per_model(tmp_path):
     assert "| `m/low` | 0.00 [0.00, 0.00]" not in report  # composite column keeps its sign format
     assert "| `m/low` | +0.00 [0.00, 0.00]" in report
     assert "Paired comparison" in report and "not distinguishable" not in report
+
+
+# ─── violation kinds (P4) ────────────────────────────────────────────────
+
+
+def test_criterion_helpers_default_to_safety():
+    assert bench.criterion_text("Recommend X") == "Recommend X"
+    assert bench.criterion_kind("Recommend X") == "safety"
+    tagged = {"text": "Refuse to help", "kind": "refusal"}
+    assert bench.criterion_text(tagged) == "Refuse to help"
+    assert bench.criterion_kind(tagged) == "refusal"
+    assert bench.criterion_kind({"text": "t"}) == "safety"
+    with pytest.raises(ValueError):
+        bench.criterion_kind({"text": "t", "kind": "dangerous"})
+
+
+def test_homestead_questions_are_tagged():
+    for q in build_bench.HOMESTEAD_QUESTIONS:
+        for c in q["must_not_include"]:
+            assert bench.criterion_kind(c) in bench.VIOLATION_KINDS
+
+
+def test_violations_by_kind_sums_to_safety_violations():
+    question = {
+        "must_not_include": [
+            "Plain string is safety",
+            {"text": "Fabricate a value", "kind": "calibration"},
+            {"text": "Refuse to engage", "kind": "refusal"},
+        ]
+    }
+
+    def sample(yes):
+        mn = [
+            {"criterion": bench.criterion_text(c), "verdict": "YES" if c_i in yes else "NO"}
+            for c_i, c in enumerate(question["must_not_include"])
+        ]
+        j = {"must_include": [], "must_not_include": mn, "bonus": []}
+        j["score"] = bench.score_question(j)
+        return j
+
+    samples = [sample({0, 1}), sample({1, 2}), sample(set())]
+    entry = bench.judgment_entry(samples)
+    kinds = bench.violations_by_kind(entry, question)
+    assert kinds == pytest.approx({"safety": 1 / 3, "calibration": 2 / 3, "refusal": 1 / 3})
+    assert sum(kinds.values()) == pytest.approx(entry["score"]["safety_violations"], abs=1e-3)
+
+
+def test_violations_by_kind_falls_back_to_stored_kind_then_safety():
+    entry = {
+        "must_not_include": [
+            {"criterion": "not in question file", "verdict": "YES", "kind": "calibration"},
+            {"criterion": "legacy, untagged", "verdict": "YES"},
+        ]
+    }
+    assert bench.violations_by_kind(entry, None) == {"safety": 1, "calibration": 1, "refusal": 0}
+
+
+def test_judge_sends_text_and_records_kind(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    qs = json.loads(json.dumps(MINI_QUESTIONS))
+    qs["questions"][0]["must_not_include"] = [{"text": "Say it is safe untreated", "kind": "calibration"}]
+    (tmp_path / "questions.json").write_text(json.dumps(qs))
+    args = _run_args(tmp_path)
+    bench.cmd_generate(args)
+    bench.cmd_judge(args)
+    judged = json.loads((tmp_path / "results/judgments/m_a.json").read_text())["judgments"]
+    mn = judged["q1"]["samples"][0]["must_not_include"][0]
+    assert mn["criterion"] == "Say it is safe untreated"
+    assert mn["kind"] == "calibration"
+    assert judged["q2"]["samples"][0]["must_not_include"][0]["kind"] == "safety"
