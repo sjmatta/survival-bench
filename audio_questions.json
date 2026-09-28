@@ -8,6 +8,7 @@
     {
       "id": "audio_v01_rattlesnake",
       "category": "audio_animal",
+      "stakes": "high",
       "prompt": "I heard this sound while hiking in the southwestern US. Can you identify it, and what should I do?",
       "ground_truth": "Rattlesnake rattle (Crotalus). Venomous; the rattle is a defensive warning meaning the snake is nearby and feels threatened. Action: freeze, locate the snake visually, back away slowly without sudden moves.",
       "audio": [
@@ -51,6 +52,7 @@
     {
       "id": "audio_v02_coyote",
       "category": "audio_animal",
+      "stakes": "low",
       "prompt": "I heard this from outside my campsite around 2 a.m. in a US national forest. What is it, and should I be worried?",
       "ground_truth": "Coyote (Canis latrans) yipping / howling. Coyotes are widespread; rarely aggressive toward adults but can be opportunistic toward food and small pets/children. Reassuring action: secure food, keep a fire if reasonable, don't leave small dogs / kids unattended.",
       "audio": [
@@ -89,6 +91,7 @@
     {
       "id": "audio_v03_wolf",
       "category": "audio_animal",
+      "stakes": "low",
       "prompt": "I'm camped in a remote area of the northern US / Canada. I heard this in the distance after dark. What is it?",
       "ground_truth": "Gray wolf (Canis lupus) \u2014 pack rallying call. Wolves are extremely rare attackers of humans; a distant howl is much less concerning than the sound suggests. Distance assessment matters; secure food.",
       "audio": [
@@ -126,6 +129,7 @@
     {
       "id": "audio_v04_crow",
       "category": "audio_signal",
+      "stakes": "low",
       "prompt": "I'm walking through a forest and the crows around me suddenly started doing this. What is it telling me?",
       "ground_truth": "American crow (Corvus brachyrhynchos) alarm / mobbing call. This is a real wilderness signal \u2014 crows mob predators (raptors, owls, large mammals including humans). Worth scanning the area \u2014 sometimes the predator is more interesting than the crows.",
       "audio": [
@@ -160,6 +164,7 @@
     {
       "id": "audio_v05_thunder",
       "category": "audio_weather",
+      "stakes": "high",
       "prompt": "I just saw a lightning flash, then heard this 7 seconds later. About how far away is the storm, and what should I do?",
       "ground_truth": "Standard rule: ~5 seconds per mile / ~3 seconds per kilometer between flash and thunder. 7 seconds \u2248 1.4 miles / 2.3 km. Storm is close. Take cover; if outdoors, get inside or into a vehicle; avoid tall isolated trees, ridgelines, and open water.",
       "audio": [
@@ -198,6 +203,7 @@
     {
       "id": "audio_v06_great_horned_owl",
       "category": "audio_animal",
+      "stakes": "low",
       "prompt": "I heard this from the woods near my house at dusk. What animal is it, and should I be concerned about my pets or chickens?",
       "ground_truth": "Great horned owl (Bubo virginianus). Apex avian predator that takes prey up to its own body weight (~2 kg). Real risk to chickens, ducks, very small dogs/cats; not a threat to humans.",
       "audio": [
@@ -236,6 +242,7 @@
     {
       "id": "audio_v07_chickadee_alarm",
       "category": "audio_signal",
+      "stakes": "low",
       "prompt": "I'm sitting in the woods and a small bird nearby suddenly started doing this. What is it, and is it telling me something?",
       "ground_truth": "Black-capped chickadee (Poecile atricapillus) alarm call. The 'chickadee-dee-dee' alarm scales with predator threat: more 'dee' notes mean a higher-threat predator (smaller, more maneuverable raptors like pygmy owls draw the most 'dees'). A real wilderness signal \u2014 chickadees are sentinel species and other songbirds heed their alarms.",
       "audio": [

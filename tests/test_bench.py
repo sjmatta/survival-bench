@@ -46,6 +46,7 @@ def test_question_schema(filename):
         for ctype in ("must_include", "bonus"):
             assert isinstance(q[ctype], list)
             assert all(isinstance(c, str) and c.strip() for c in q[ctype])
+        assert q.get("stakes") in bench.STAKES_LEVELS, f"{q['id']}: stakes must be high or low"
         assert isinstance(q["must_not_include"], list)
         for c in q["must_not_include"]:
             assert isinstance(c, str) or set(c) <= {"text", "kind"}, f"{q['id']}: bad keys {c}"
@@ -587,3 +588,58 @@ def test_judge_sends_text_and_records_kind(tmp_path, monkeypatch):
     assert mn["criterion"] == "Say it is safe untreated"
     assert mn["kind"] == "calibration"
     assert judged["q2"]["samples"][0]["must_not_include"][0]["kind"] == "safety"
+
+
+# ─── stakes breakdown (P5) ───────────────────────────────────────────────
+
+
+def test_homestead_questions_have_stakes():
+    for q in build_bench.HOMESTEAD_QUESTIONS:
+        assert q["stakes"] in bench.STAKES_LEVELS
+
+
+def _calib_entry(violated_per_sample, correctness=1.0):
+    samples = []
+    for i, yes in enumerate(violated_per_sample):
+        mn = [{"criterion": "Fabricate", "verdict": "YES" if yes else "NO"}]
+        j = {"sample": i, "must_include": [], "must_not_include": mn, "bonus": []}
+        j["score"] = {**bench.score_question(j), "correctness": correctness}
+        samples.append(j)
+    return bench.judgment_entry(samples)
+
+
+def test_stakes_breakdown_rates():
+    q_tag = [{"text": "Fabricate", "kind": "calibration"}]
+    questions = {
+        "hi1": {"stakes": "high", "must_not_include": q_tag},
+        "hi2": {"stakes": "high", "must_not_include": q_tag},
+        "lo1": {"stakes": "low", "must_not_include": q_tag},
+        "untagged": {"must_not_include": q_tag},
+    }
+    record = {
+        "judgments": {
+            "hi1": _calib_entry([False, False]),
+            "hi2": _calib_entry([True, False], correctness=0.5),
+            "lo1": _calib_entry([True, True]),
+            "untagged": _calib_entry([True]),
+        }
+    }
+    rows = {r["stakes"]: r for r in bench.stakes_breakdown(record, questions)}
+    assert set(rows) == {"high", "low"}
+    assert rows["high"]["n"] == 2
+    assert rows["high"]["calib_rate"] == pytest.approx(0.25)  # 1 of 4 answers
+    assert rows["high"]["calib_per_q"] == pytest.approx(0.25)
+    assert rows["high"]["correctness"] == pytest.approx(0.75)
+    assert rows["low"]["calib_rate"] == pytest.approx(1.0)
+
+
+def test_violation_sample_rate_only_counts_requested_kind():
+    question = {"must_not_include": ["Safety item", {"text": "Fabricate", "kind": "calibration"}]}
+    entry = {
+        "must_not_include": [
+            {"criterion": "Safety item", "verdict": "YES"},
+            {"criterion": "Fabricate", "verdict": "NO"},
+        ]
+    }
+    assert bench.violation_sample_rate(entry, question, "calibration") == 0.0
+    assert bench.violation_sample_rate(entry, question, "safety") == 1.0

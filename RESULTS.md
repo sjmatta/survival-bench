@@ -91,6 +91,50 @@ Local, gitignored artifacts:
 - Question snapshots in both directories; image bytes and hashes in the vision
   directory. Credentials are excluded from these artifacts.
 
+### Hypothesis (untested): stakes-dependent calibration
+
+Artificial Analysis's [AA-Omniscience](https://artificialanalysis.ai/evaluations/omniscience)
+reports a hallucination rate of 81.9% for Muse Glimmer (high reasoning) and 49.3%
+for Qwen3.6 27B (checked September 27, 2026). That rate is incorrect answers as a
+share of all non-correct responses, so a model that rarely abstains scores
+badly. This bench shows the opposite ordering for Muse and the newer Qwen3.8.
+One proposed explanation is that Muse hedges when stakes are high but still
+fabricates low-stakes trivia. Both models invented details about the fake
+squash cultivar (`calib_11_fake_squash`).
+
+To test this, every question now carries `stakes: high | low`. High means that
+acting on a wrong answer could plausibly cause serious injury, poisoning, or
+death. Low means the worst case is wasted effort, lost food, or a harmless false
+belief. The report breaks results down by stakes. The Sept 6 text judgments
+(unchanged, Opus 5 judge) give:
+
+| Model | Stakes | Questions | Correctness | Answers with a calibration violation |
+|---|---|---:|---:|---:|
+| `meta/muse-glimmer-30b` | high | 35 | 80% | 0 (0%) |
+| `meta/muse-glimmer-30b` | low | 10 | 71% | 1 (10%) |
+| `qwen/qwen3.8-27b` | high | 35 | 76% | 2 (6%) |
+| `qwen/qwen3.8-27b` | low | 10 | 74% | 2 (20%) |
+
+**This does not support the hypothesis, and it does not refute it.**
+
+- Muse's only low-stakes calibration violation is the fake squash. One
+  violation across 10 single-sample questions cannot establish a pattern: a
+  one-sided Fisher test of 0/35 vs 1/10 gives p ≈ 0.22.
+- The comparison is confounded. Low-stakes questions carry about 1.8
+  calibration criteria each, versus about 0.6 for high-stakes questions, so a
+  model has more chances to trigger one. Restricted to questions with at least
+  one calibration criterion, Muse is 0/12 high vs 1/8 low and Qwen is 2/12 vs 2/8.
+- The data here points the other way from AA-Omniscience: Qwen has more
+  calibration violations than Muse at both stakes levels. This bench's
+  calibration items target specific fabrication traps, and AA-Omniscience
+  measures open-domain factual recall without penalizing abstention, whereas
+  this bench penalizes refusal. The two can legitimately disagree, and 45
+  questions cannot resolve that.
+
+Settling this needs more low-stakes fabrication questions with a comparable
+number of calibration criteria per question, plus multiple samples. Adding
+questions would narrow the interval faster than adding samples.
+
 ## September 6 expansion: Nemotron and Granite 8B
 
 Both text-only candidates completed all 45 questions through OpenRouter. The

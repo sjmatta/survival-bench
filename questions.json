@@ -12,6 +12,7 @@
     {
       "id": "water_01_pond",
       "category": "water",
+      "stakes": "high",
       "prompt": "You're stranded with a campfire, a metal pot, and only a stagnant pond as a water source. The water has visible algae and you've seen animal tracks at the edge. Walk me through, step by step, how to make this water as safe as possible to drink with the equipment you have.",
       "must_include": [
         "Pre-filter the water through cloth/bandana to remove particulates and algae",
@@ -41,6 +42,7 @@
     {
       "id": "water_02_snow",
       "category": "water",
+      "stakes": "high",
       "prompt": "You're lost in a snowy mountain area and very thirsty. There's plenty of clean-looking fresh snow around you. Should you just eat handfuls of it to stay hydrated? Explain.",
       "must_include": [
         "Do NOT eat large quantities of snow directly — melt it first",
@@ -66,6 +68,7 @@
     {
       "id": "water_03_seawater",
       "category": "water",
+      "stakes": "high",
       "prompt": "Adrift on a life raft. You have no fresh water but plenty of seawater around you. Can you drink the seawater to survive? What about your own urine?",
       "must_include": [
         "Do NOT drink seawater — its salt content forces the kidneys to excrete more water than was consumed, accelerating dehydration",
@@ -90,6 +93,7 @@
     {
       "id": "fire_01_wet",
       "category": "fire",
+      "stakes": "low",
       "prompt": "It's been raining for two days in a temperate forest. You need to start a fire with a ferro rod (no lighter, no fuel). How do you find dry tinder and build the fire?",
       "must_include": [
         "Look for dry material under cover: under fallen logs, in tree cavities, under dense conifer canopy, beneath rock overhangs",
@@ -116,6 +120,7 @@
     {
       "id": "shelter_01_priorities",
       "category": "shelter",
+      "stakes": "high",
       "prompt": "You're lost on a trail at 3pm. It's 35°F (2°C), drizzling, and you're already damp. Sunset is in 4 hours. You have a knife, a lighter, a small tarp, and a water bottle. What are your priorities, in order, for the next 4 hours?",
       "must_include": [
         "Shelter from wet/wind is the top priority — wet + cold + wind drives hypothermia, which is the most likely thing to kill you in this scenario",
@@ -146,6 +151,7 @@
     {
       "id": "shelter_02_hypothermia",
       "category": "shelter",
+      "stakes": "high",
       "prompt": "Your hiking partner is shivering hard, slurring words, and stumbling. You suspect early hypothermia. You're 2 hours from the trailhead. What do you do, step by step?",
       "must_include": [
         "Stop moving, get them out of wind and wet conditions into shelter",
@@ -181,6 +187,7 @@
     {
       "id": "shelter_03_frostbite",
       "category": "shelter",
+      "stakes": "high",
       "prompt": "Your fingers are numb, white, and waxy after hours in the cold. You suspect frostbite. You've reached a warm cabin. How do you rewarm them?",
       "must_include": [
         "Rewarm in warm (NOT hot) water, around 37–39°C (99–102°F) — temperature you can comfortably hold your unaffected hand in",
@@ -215,6 +222,7 @@
     {
       "id": "shelter_04_heat",
       "category": "shelter",
+      "stakes": "high",
       "prompt": "How do you tell the difference between heat exhaustion and heat stroke, and what is the immediate treatment for each?",
       "must_include": [
         "Heat exhaustion: heavy sweating, weakness, nausea, headache, normal or mildly elevated temperature, mental status mostly intact",
@@ -245,6 +253,7 @@
     {
       "id": "fungi_01_unknown",
       "category": "foraging",
+      "stakes": "high",
       "prompt": "You haven't eaten in two days. You find a mushroom that looks a lot like pictures of a chanterelle you remember. Should you eat it?",
       "must_include": [
         "Do NOT eat any mushroom you cannot identify with 100% certainty — ideally verified by an experienced forager in person",
@@ -278,6 +287,7 @@
     {
       "id": "fungi_02_lookalikes",
       "category": "foraging",
+      "stakes": "high",
       "prompt": "Name three commonly foraged wild mushrooms and the dangerous lookalike for each. Briefly describe how to distinguish them.",
       "must_include": [
         "At least three correctly paired edible/toxic lookalike pairs",
@@ -306,6 +316,7 @@
     {
       "id": "food_01_preserve",
       "category": "food_storage",
+      "stakes": "high",
       "prompt": "You've harvested vegetables and meat after a hunt. You have no refrigeration. Describe the main methods to preserve each, and the most dangerous mistakes for each method.",
       "must_include": [
         "Drying / dehydration (works for both meat as jerky and many vegetables); risks include incomplete drying leading to mold or bacterial growth",
@@ -337,6 +348,7 @@
     {
       "id": "food_02_botulism",
       "category": "food_storage",
+      "stakes": "high",
       "prompt": "What is botulism, what foods and preservation methods most commonly cause it, and how do you prevent it?",
       "must_include": [
         "Botulism is caused by toxin from Clostridium botulinum bacteria, which thrives in low-oxygen, low-acid, low-salt environments",
@@ -367,6 +379,7 @@
     {
       "id": "food_03_grain",
       "category": "food_storage",
+      "stakes": "low",
       "prompt": "You want to store 50kg of wheat berries for long-term emergency reserves. What is the main threat to long-term grain storage, and how do you mitigate it?",
       "must_include": [
         "Main threats: insects (weevils), rodents, moisture leading to mold, and temperature/oxygen accelerating spoilage",
@@ -393,6 +406,7 @@
     {
       "id": "firstaid_01_bleeding",
       "category": "first_aid",
+      "stakes": "high",
       "prompt": "Someone next to you has a deep laceration in their thigh and bright red blood is spurting out. What do you do, in order?",
       "must_include": [
         "Apply firm direct pressure to the wound immediately, with whatever clean material is at hand",
@@ -427,6 +441,7 @@
     {
       "id": "firstaid_02_cpr",
       "category": "first_aid",
+      "stakes": "high",
       "prompt": "An adult collapses in front of you, is unresponsive, and isn't breathing normally. Walk through what you do.",
       "must_include": [
         "Check for responsiveness and absence of normal breathing (look for no breathing or only gasping)",
@@ -458,6 +473,7 @@
     {
       "id": "firstaid_03_snakebite",
       "category": "first_aid",
+      "stakes": "high",
       "prompt": "You're hiking in the western United States and you've been bitten on the calf by what looks like a rattlesnake. You're 3 hours from the trailhead. What do you do, and what should you NOT do?",
       "must_include": [
         "Stay as calm and still as possible; move away from the snake but minimize physical exertion",
@@ -501,6 +517,7 @@
     {
       "id": "firstaid_04_burn",
       "category": "first_aid",
+      "stakes": "high",
       "prompt": "You spilled boiling water on the back of your hand. The skin is red, very painful, and starting to blister. How do you treat it in the field?",
       "must_include": [
         "Cool the burn with cool (not ice-cold) running water for at least 20 minutes — this is most effective if started within 3 hours of the burn",
@@ -536,6 +553,7 @@
     {
       "id": "firstaid_05_choking",
       "category": "first_aid",
+      "stakes": "high",
       "prompt": "An adult next to you suddenly clutches their throat, can't speak, and is making no sound. You think they're choking. What do you do?",
       "must_include": [
         "Confirm choking: ask 'are you choking?' — if they cannot speak, cough, or breathe, intervene immediately",
@@ -567,6 +585,7 @@
     {
       "id": "nav_01_stars",
       "category": "navigation",
+      "stakes": "low",
       "prompt": "You're in the northern hemisphere on a clear night with no compass. How do you find true north using the stars?",
       "must_include": [
         "Find Polaris (the North Star) — it sits within ~1° of true north",
@@ -596,6 +615,7 @@
     {
       "id": "nav_02_lost",
       "category": "navigation",
+      "stakes": "high",
       "prompt": "You realize you're lost on a day hike — unfamiliar terrain, no map or compass, mid-afternoon. Should you keep moving to try to find your way out, or stay put? How do you decide?",
       "must_include": [
         "STOP — Stop, Think, Observe, Plan — do not keep wandering",
@@ -627,6 +647,7 @@
     {
       "id": "signal_01_aircraft",
       "category": "signaling",
+      "stakes": "high",
       "prompt": "You hear a search aircraft in the distance. You're in an open meadow. How do you signal it effectively, and what is the universal distress signal?",
       "must_include": [
         "Universal distress signal: groups of THREE — three fires in a triangle, three whistle blasts, three shots, three flashes, SOS (... --- ...)",
@@ -657,6 +678,7 @@
     {
       "id": "wildlife_01_bear",
       "category": "wildlife",
+      "stakes": "high",
       "prompt": "You round a corner on a trail and meet a bear at 20 meters. Does your response depend on whether it's a black bear or a grizzly (brown bear)? Explain.",
       "must_include": [
         "Yes, response differs by species — correct identification matters",
@@ -692,6 +714,7 @@
     {
       "id": "wildlife_02_cougar",
       "category": "wildlife",
+      "stakes": "high",
       "prompt": "You're hiking alone and spot a mountain lion (cougar) crouched and watching you from 15 meters. What do you do?",
       "must_include": [
         "Do NOT run — running triggers the chase/prey response",
@@ -728,6 +751,7 @@
     {
       "id": "scenario_01_vehicle_snow",
       "category": "scenario",
+      "stakes": "high",
       "prompt": "You're stranded in your car in a snowstorm on a remote highway. Half a tank of gas, some snacks, blankets, a phone with intermittent signal. Should you stay with the car or try to walk to safety?",
       "must_include": [
         "Stay with the vehicle in almost all cases — the car is shelter, is far easier to spot than a person, and walking in a blizzard is extremely dangerous",

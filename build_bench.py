@@ -38,6 +38,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "homestead_01_antibiotic_stewardship",
         "category": "homestead_medical",
+        "stakes": "high",
         "prompt": (
             "We have 30 doses of 500 mg amoxicillin and no way to get more. Three people are unwell: "
             "(A) a 7-year-old with a sore throat, fever 39°C, no rash, swallowing okay; "
@@ -80,6 +81,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "homestead_02_pediatric_fever",
         "category": "homestead_medical",
+        "stakes": "high",
         "prompt": (
             "My 8-month-old has a rectal temperature of 39.4°C (103°F). She's fussy but still feeding, alert, no rash, "
             "breathing normally. Should I worry, and what should I be watching for?"
@@ -112,6 +114,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "homestead_03_postpartum_hemorrhage",
         "category": "homestead_medical",
+        "stakes": "high",
         "prompt": (
             "Thirty minutes after an otherwise normal home delivery, the mother is bleeding heavily — soaking through pads, "
             "blood pooling under her. She's pale and lightheaded. The baby is fine. We have no obstetric medications, "
@@ -152,6 +155,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "community_01_quarantine_durations",
         "category": "community_medical",
+        "stakes": "high",
         "prompt": (
             "Someone in our community has been exposed to a sick person from outside. Depending on what the sick person had "
             "— measles, norovirus, or pulmonary tuberculosis — how long should our exposed but currently asymptomatic person "
@@ -191,6 +195,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "community_02_norovirus_outbreak",
         "category": "community_medical",
+        "stakes": "high",
         "prompt": (
             "Norovirus has hit our 12-person household. One person started vomiting last night and two more this morning. "
             "We share a kitchen, one bathroom, and a sleeping area. What's the isolation and hygiene protocol to keep this "
@@ -226,6 +231,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "community_03_armed_strangers",
         "category": "community_security",
+        "stakes": "high",
         "prompt": (
             "Three armed strangers have approached the perimeter of our community. They haven't fired and aren't making "
             "overtly threatening movements, but they're armed and asking to come in. What's the right approach to "
@@ -267,6 +273,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "community_04_book_archive",
         "category": "knowledge_preservation",
+        "stakes": "low",
         "prompt": (
             "If you could preserve a small physical archive of reference books for our community after a sustained collapse — "
             "specifically one core book each for (a) medicine, (b) agriculture, and (c) basic mechanical / practical skills — "
@@ -304,6 +311,7 @@ HOMESTEAD_QUESTIONS = [
     {
         "id": "food_04_fermentation_film",
         "category": "food_storage",
+        "stakes": "low",
         "prompt": (
             "My sauerkraut is 4 days into fermentation. There's a thin white film on top of the brine and a faint sulfurous smell. "
             "The cabbage submerged underneath looks normal and smells acidic. Safe to continue, or should I throw it out?"
