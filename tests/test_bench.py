@@ -643,3 +643,125 @@ def test_violation_sample_rate_only_counts_requested_kind():
     }
     assert bench.violation_sample_rate(entry, question, "calibration") == 0.0
     assert bench.violation_sample_rate(entry, question, "safety") == 1.0
+
+
+# ─── strict judge, retries, INVALID (P6) ─────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "text,meta,expected",
+    [
+        ("YES: covers it", {"finish_reason": "stop"}, "YES"),
+        ("  NO: misses the point\n", {"finish_reason": "stop"}, "NO"),
+        ("YES: fine", None, "YES"),
+        ("The answer is YES because it covers it.", {"finish_reason": "stop"}, None),
+        ("yes: lowercase", {"finish_reason": "stop"}, None),
+        ("YES because", {"finish_reason": "stop"}, None),
+        ("YES: truncated", {"finish_reason": "length"}, None),
+        ("YES: from reasoning", {"finish_reason": "stop", "used_reasoning_field": True}, None),
+        ("", {"finish_reason": "stop"}, None),
+    ],
+)
+def test_parse_judge_verdict_is_strict(text, meta, expected):
+    verdict, _ = bench.parse_judge_verdict(text, meta)
+    assert verdict == expected
+
+
+class ScriptedJudge:
+    """Returns scripted (text, meta) replies, or raises when the script holds an exception."""
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls = []
+
+    def __call__(self, base, model, system, user, **kw):
+        self.calls.append(kw)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        text, finish, reasoning = reply
+        return text, {"finish_reason": finish, "used_reasoning_field": reasoning}
+
+
+def _judge(monkeypatch, replies, **kw):
+    fake = ScriptedJudge(replies)
+    monkeypatch.setattr(bench, "chat", fake)
+    res = bench.judge_response("b", "judge", "Q?", "answer", "must_include", "crit", **kw)
+    return res, fake.calls
+
+
+def test_judge_retries_with_larger_cap_then_accepts(monkeypatch):
+    res, calls = _judge(
+        monkeypatch,
+        [("thinking...", "stop", True), ("YES: parti", "length", False), ("YES: covers it", "stop", False)],
+    )
+    assert res["verdict"] == "YES" and res["reason"] == "covers it" and res["attempts"] == 3
+    assert [c["max_tokens"] for c in calls] == [2048, 8192, 8192]
+    assert all(c["reasoning_effort"] == "low" and c["temperature"] == 0.0 for c in calls)
+
+
+def test_judge_records_invalid_instead_of_guessing(monkeypatch):
+    res, calls = _judge(
+        monkeypatch,
+        [("It is YES.", "stop", False), OSError("boom"), ("maybe", "stop", False)],
+        max_tokens=100,
+        retry_max_tokens=300,
+        reasoning_effort="",
+    )
+    assert res["verdict"] == bench.INVALID
+    assert "3 attempts" in res["reason"] and "maybe" in res["reason"]
+    assert [c["max_tokens"] for c in calls] == [100, 300, 300]
+    assert all(c["reasoning_effort"] == "" for c in calls)
+
+
+def test_score_question_excludes_invalid():
+    j = {
+        "must_include": [{"verdict": "YES"}, {"verdict": bench.INVALID}],
+        "must_not_include": [{"verdict": bench.INVALID}],
+        "bonus": [{"verdict": "NO"}, {"verdict": bench.INVALID}],
+    }
+    s = bench.score_question(j)
+    assert s["correctness"] == 1.0
+    assert s["safety_violations"] == 0
+    assert s["bonus_rate"] == 0.0
+    assert s["composite"] == pytest.approx(1.0)
+
+
+def test_resume_rejudges_only_invalid_criteria(tmp_path, monkeypatch):
+    fake = FakeEndpoint()
+    monkeypatch.setattr(bench, "chat", fake)
+    args = _run_args(tmp_path)
+    bench.cmd_generate(args)
+    bench.cmd_judge(args)
+    assert fake.calls["judge"] == 6
+
+    path = tmp_path / "results/judgments/m_a.json"
+    rec = json.loads(path.read_text())
+    sample = rec["judgments"]["q1"]["samples"][0]
+    sample["must_include"][0]["verdict"] = bench.INVALID
+    sample["bonus"][0]["reason"] = "judge-error: URLError: timeout"  # legacy error recorded as NO
+    del sample["score"]
+    path.write_text(json.dumps(rec))
+    assert bench.count_invalid(rec) == 1
+
+    bench.cmd_judge(args)
+    assert fake.calls["judge"] == 8  # just the two unusable criteria
+    rec = json.loads(path.read_text())
+    sample = rec["judgments"]["q1"]["samples"][0]
+    assert [c["verdict"] for c in sample["must_include"]] == ["YES"]
+    assert len(sample["must_not_include"]) == 1 and len(sample["bonus"]) == 1
+    assert bench.count_invalid(rec) == 0
+    assert sample["score"]["correctness"] == 1.0
+
+
+def test_judge_cli_defaults_reproduce_wrapper(monkeypatch):
+    captured = []
+    monkeypatch.setattr(bench, "cmd_judge", captured.append)
+    monkeypatch.setattr(sys, "argv", ["bench.py", "judge"])
+    bench.main()
+    args = captured.pop()
+    assert (args.judge_max_tokens, args.judge_retry_max_tokens, args.judge_reasoning_effort) == (
+        2048,
+        8192,
+        "low",
+    )

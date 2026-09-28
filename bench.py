@@ -658,6 +658,30 @@ def parse_judge_line(line: str) -> tuple[str, str]:
     return "NO", f"unparseable: {line[:120]}"
 
 
+INVALID = "INVALID"
+JUDGE_MAX_TOKENS = 2048
+JUDGE_RETRY_MAX_TOKENS = 8192
+JUDGE_REASONING_EFFORT = "low"
+JUDGE_ATTEMPTS = 3  # first try plus up to two retries
+
+
+def parse_judge_verdict(text: str, meta: dict | None = None) -> tuple[str | None, str]:
+    """Strict judge parsing: final content must start with 'YES:' or 'NO:' after a normal stop.
+
+    Returns (None, why) for anything else, including text recovered from a reasoning field or a
+    response cut off by the token cap, so callers can retry instead of guessing a verdict.
+    """
+    meta = meta or {}
+    if meta.get("used_reasoning_field"):
+        return None, "no final content (reasoning only)"
+    if meta.get("finish_reason") not in (None, "stop"):
+        return None, f"finish_reason={meta.get('finish_reason')}"
+    m = re.match(r"(YES|NO):\s*(.*)", text.strip())
+    if not m:
+        return None, f"unparseable: {text.strip()[:120]!r}"
+    return m.group(1), m.group(2).splitlines()[0].strip() if m.group(2) else ""
+
+
 def judge_response(
     base: str,
     judge_model: str,
@@ -668,6 +692,10 @@ def judge_response(
     *,
     api_key: str = "",
     ground_truth: str = "",
+    max_tokens: int = JUDGE_MAX_TOKENS,
+    retry_max_tokens: int = JUDGE_RETRY_MAX_TOKENS,
+    reasoning_effort: str = JUDGE_REASONING_EFFORT,
+    attempts: int = JUDGE_ATTEMPTS,
 ) -> dict:
     gt_block = (
         f"\nGROUND TRUTH (the actual species/condition shown — use to interpret criteria):\n{ground_truth}\n"
@@ -681,26 +709,48 @@ def judge_response(
         criterion=criterion,
         ground_truth_block=gt_block,
     )
-    text, meta = chat(
-        base,
-        judge_model,
-        JUDGE_SYSTEM,
-        user,
-        api_key=api_key,
-        temperature=0.0,
-        max_tokens=128,
-        timeout=DEFAULT_TIMEOUT,
-    )
-    # Some models prepend reasoning_content or extra prose; take first non-empty line.
-    first = next((ln for ln in text.splitlines() if ln.strip()), text)
-    verdict, reason = parse_judge_line(first)
-    return {"criterion": criterion, "verdict": verdict, "reason": reason, "raw": text.strip()}
+    problem, text = "", ""
+    for attempt in range(attempts):
+        try:
+            text, meta = chat(
+                base,
+                judge_model,
+                JUDGE_SYSTEM,
+                user,
+                api_key=api_key,
+                temperature=0.0,
+                max_tokens=max_tokens if attempt == 0 else retry_max_tokens,
+                timeout=DEFAULT_TIMEOUT,
+                reasoning_effort=reasoning_effort,
+            )
+        except Exception as e:
+            problem, text = f"judge-error: {type(e).__name__}: {e}", ""
+            continue
+        verdict, reason = parse_judge_verdict(text, meta)
+        if verdict:
+            return {
+                "criterion": criterion,
+                "verdict": verdict,
+                "reason": reason,
+                "raw": text.strip(),
+                "attempts": attempt + 1,
+            }
+        problem = reason
+    # Never guess: an unreadable verdict is recorded as INVALID and excluded from scoring.
+    return {
+        "criterion": criterion,
+        "verdict": INVALID,
+        "reason": f"no valid YES/NO after {attempts} attempts; last: {problem}",
+        "raw": text.strip(),
+        "attempts": attempts,
+    }
 
 
 def score_question(judgment: dict) -> dict:
-    mi = judgment["must_include"]
-    mn = judgment["must_not_include"]
-    bn = judgment["bonus"]
+    # INVALID verdicts (no readable judge output) are excluded rather than counted either way.
+    mi = [x for x in judgment["must_include"] if x["verdict"] != INVALID]
+    mn = [x for x in judgment["must_not_include"] if x["verdict"] != INVALID]
+    bn = [x for x in judgment["bonus"] if x["verdict"] != INVALID]
     mi_hits = sum(1 for x in mi if x["verdict"] == "YES")
     mn_violations = sum(1 for x in mn if x["verdict"] == "YES")
     bn_hits = sum(1 for x in bn if x["verdict"] == "YES")
@@ -792,11 +842,32 @@ def stakes_breakdown(record: dict, questions: dict) -> list[dict]:
     return out
 
 
-def sample_fully_judged(judgment: dict | None, expected: int) -> bool:
-    """A cached sample judgment can be reused if it has no error and every criterion present."""
-    if not judgment or judgment.get("error"):
-        return False
-    return sum(len(judgment.get(c, [])) for c in CRITERION_TYPES) >= expected
+def is_valid_verdict(c: dict) -> bool:
+    """A cached criterion verdict is reusable; INVALID and legacy judge-error entries are not."""
+    return c.get("verdict") in ("YES", "NO") and not str(c.get("reason", "")).startswith("judge-error")
+
+
+def criteria_to_judge(prev: dict | None, question: dict) -> tuple[dict, list[tuple[str, str]]]:
+    """Split a sample's cached judgment into reusable verdicts and (ctype, criterion) still to judge."""
+    usable = prev if prev and not prev.get("error") else {}
+    kept = {ct: [c for c in usable.get(ct, []) if is_valid_verdict(c)] for ct in CRITERION_TYPES}
+    todo = []
+    for ct in CRITERION_TYPES:
+        done = {c.get("criterion") for c in kept[ct]}
+        todo += [(ct, text) for text in map(criterion_text, question.get(ct, [])) if text not in done]
+    return kept, todo
+
+
+def count_invalid(record: dict) -> int:
+    """Criteria across all samples whose judge output never parsed to YES/NO."""
+    return sum(
+        1
+        for entry in record["judgments"].values()
+        for sj in judgment_samples(entry)
+        for ct in CRITERION_TYPES
+        for c in sj.get(ct, [])
+        if c.get("verdict") == INVALID
+    )
 
 
 def judgment_entry(slots: list[dict]) -> dict:
@@ -824,6 +895,11 @@ def cmd_judge(args: argparse.Namespace) -> None:
         ranked = sorted(models, key=lambda m: _size_hint(m), reverse=True)
         judge_model = ranked[0]
     print(f"Judge model: {judge_model}")
+    print(
+        f"Judge settings: max_tokens={getattr(args, 'judge_max_tokens', JUDGE_MAX_TOKENS)}, "
+        f"retry_max_tokens={getattr(args, 'judge_retry_max_tokens', JUDGE_RETRY_MAX_TOKENS)}, "
+        f"reasoning_effort={getattr(args, 'judge_reasoning_effort', JUDGE_REASONING_EFFORT) or 'unset'}"
+    )
 
     # Build the full task list across all models. Each answer sample gets its own judgment
     # slot, tagged with its sample index so results route back and resume stays aligned.
@@ -852,7 +928,6 @@ def cmd_judge(args: argparse.Namespace) -> None:
             if not q:
                 continue
             prev = {j.get("sample", 0): j for j in judgment_samples(existing.get(qid, {}))}
-            expected = sum(len(q.get(c, [])) for c in CRITERION_TYPES)
             slots: list[dict] = []
             for sidx, ans in enumerate(samples):
                 if ans.get("error") == PENDING:
@@ -872,12 +947,13 @@ def cmd_judge(args: argparse.Namespace) -> None:
                             "composite": -1.0,
                         },
                     }
-                elif sample_fully_judged(prev.get(sidx), expected):
-                    slot = {"sample": sidx, **prev[sidx]}
                 else:
-                    slot = {"sample": sidx, "must_include": [], "must_not_include": [], "bonus": []}
-                    for ctype in CRITERION_TYPES:
-                        for crit in map(criterion_text, q.get(ctype, [])):
+                    kept, todo = criteria_to_judge(prev.get(sidx), q)
+                    if not todo:
+                        slot = {"sample": sidx, **prev[sidx]}
+                    else:
+                        slot = {"sample": sidx, **kept}
+                        for ctype, crit in todo:
                             tasks.append((model, qid, sidx, ans["text"], ctype, crit))
                 slots.append(slot)
                 slots_by_key[(model, qid, sidx)] = slot
@@ -924,11 +1000,14 @@ def cmd_judge(args: argparse.Namespace) -> None:
                 crit,
                 api_key=args.api_key,
                 ground_truth=q.get("ground_truth", ""),
+                max_tokens=getattr(args, "judge_max_tokens", JUDGE_MAX_TOKENS),
+                retry_max_tokens=getattr(args, "judge_retry_max_tokens", JUDGE_RETRY_MAX_TOKENS),
+                reasoning_effort=getattr(args, "judge_reasoning_effort", JUDGE_REASONING_EFFORT),
             )
         except Exception as e:
             res = {
                 "criterion": crit,
-                "verdict": "NO",
+                "verdict": INVALID,
                 "reason": f"judge-error: {type(e).__name__}: {e}",
                 "raw": "",
             }
@@ -1106,9 +1185,9 @@ def cmd_report(args: argparse.Namespace) -> None:
     out_lines.append("## Overall\n")
     out_lines.append(
         "| Model | Composite [95% CI] | Correctness | Safety viol. | Calib. viol. | Refusal viol. "
-        "| Bonus | Q failed | Truncated/empty | Config |"
+        "| Bonus | Q failed | Truncated/empty | Invalid verdicts | Config |"
     )
-    out_lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
+    out_lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
     summary = []
     for r in rows:
         scores = [j.get("score", {}) for j in r["judgments"].values() if j]
@@ -1132,7 +1211,7 @@ def cmd_report(args: argparse.Namespace) -> None:
             f"| `{m}` | {comp:+.2f} {fmt_ci(bootstrap_ci(list(question_composites(rec).values())))} "
             f"| {corr:.0%} | {' | '.join(fmt_count(viols[k]) for k in VIOLATION_KINDS)} "
             f"| {bonus:.0%} | {failed} "
-            f"| {truncated[m]} | {format_config(configs.get(m))} |"
+            f"| {truncated[m]} | {count_invalid(rec)} | {format_config(configs.get(m))} |"
         )
     out_lines.append("")
     out_lines.append(
@@ -1143,7 +1222,8 @@ def cmd_report(args: argparse.Namespace) -> None:
     out_lines.append(
         "_Truncated/empty counts answers with `finish_reason=length`, no final content, or a "
         "reasoning-field fallback. Answers recorded before `finish_reason` was saved are counted "
-        "only when empty or fallback._"
+        "only when empty or fallback. Invalid verdicts are criteria whose judge output never parsed "
+        "to YES/NO after retries; they are excluded from scoring and re-judged on `--resume`._"
     )
     out_lines.append("")
 
@@ -1318,7 +1398,25 @@ def main() -> None:
     sp.add_argument("--judge-model", help="model ID for judging (default: largest available)")
     sp.add_argument("--concurrency", type=int, default=64, help="parallel API calls")
     sp.add_argument("--out-dir", help="results directory (default ./results)")
-    sp.add_argument("--resume", action="store_true", help="skip already-judged models")
+    sp.add_argument("--resume", action="store_true", help="skip already-judged criteria")
+    sp.add_argument(
+        "--judge-max-tokens",
+        type=int,
+        default=JUDGE_MAX_TOKENS,
+        help="judge output cap for the first attempt (includes reasoning tokens)",
+    )
+    sp.add_argument(
+        "--judge-retry-max-tokens",
+        type=int,
+        default=JUDGE_RETRY_MAX_TOKENS,
+        help="judge output cap for the up-to-two retries after an unreadable verdict",
+    )
+    sp.add_argument(
+        "--judge-reasoning-effort",
+        default=JUDGE_REASONING_EFFORT,
+        choices=REASONING_EFFORT_CHOICES,
+        help="reasoning.effort sent to the judge; empty = no reasoning field",
+    )
     sp.set_defaults(func=cmd_judge)
 
     sp = sub.add_parser("report", help="produce results/report.md")
@@ -1363,6 +1461,24 @@ def main() -> None:
     sp.add_argument("--provider-order", default="")
     sp.add_argument("--label", default="")
     sp.add_argument("--samples", type=int, default=1)
+    sp.add_argument(
+        "--judge-max-tokens",
+        type=int,
+        default=JUDGE_MAX_TOKENS,
+        help="judge output cap for the first attempt (includes reasoning tokens)",
+    )
+    sp.add_argument(
+        "--judge-retry-max-tokens",
+        type=int,
+        default=JUDGE_RETRY_MAX_TOKENS,
+        help="judge output cap for the up-to-two retries after an unreadable verdict",
+    )
+    sp.add_argument(
+        "--judge-reasoning-effort",
+        default=JUDGE_REASONING_EFFORT,
+        choices=REASONING_EFFORT_CHOICES,
+        help="reasoning.effort sent to the judge; empty = no reasoning field",
+    )
     sp.set_defaults(func=cmd_all)
 
     args = p.parse_args()

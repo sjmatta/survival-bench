@@ -53,7 +53,9 @@ from the final scores. The final judge settings were temperature 0, low reasonin
 and a 2,048-token cap with an 8,192-token retry allowance. Every reported judgment
 was matched to a raw response with an explicit final `YES:`/`NO:` verdict and a
 normal stop. All 1,136 criteria, answer coverage, and computed scores were audited.
-The run-specific wrapper handled this repair; the general harness is unchanged.
+The run-specific wrapper handled this repair at the time. The stock `judge` command
+now implements the same settings and acceptance rule, with one extra retry, and
+records unreadable verdicts as `INVALID` rather than guessing.
 
 The judge receives the question, candidate answer, criterion, and ground-truth
 text when supplied. It does not independently inspect the vision images.

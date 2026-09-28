@@ -89,14 +89,29 @@ python bench.py generate --questions bench.json --out-dir results --resume \
   --models "qwen/qwen3.8-27b" --reasoning-effort none --max-tokens 4000
 python bench.py generate --questions bench.json --out-dir results --resume \
   --models "meta/muse-glimmer-30b" --max-tokens 8192
-# After grading:
+python bench.py judge --questions bench.json --out-dir results --resume \
+  --judge-model anthropic/claude-opus-5
 python bench.py report --questions bench.json --out-dir results
 ```
 
-**Current judge setup:** The Opus 5 evaluation used a run-specific wrapper with
-a larger judge budget and validation of final YES/NO output. The stock `judge`
-command still caps output at 128 tokens and is not sufficient for reproducing
-that run; see [configuration and verification](RESULTS.md#configuration-and-verification).
+**Judge setup:** The stock `judge` command reproduces the Opus 5 grading
+configuration: temperature 0, `--judge-reasoning-effort low`, and a
+`--judge-max-tokens 2048` first attempt with up to two retries at
+`--judge-retry-max-tokens 8192`. A verdict is accepted only when the final
+content (not a reasoning field) starts with `YES:` or `NO:` and the response
+ended normally. Otherwise the criterion is recorded as `INVALID`: it is excluded
+from scoring, counted per model in the report, and re-judged on `--resume`.
+Pass the judge with `poe bench-text --judge-model anthropic/claude-opus-5`
+(extra arguments are appended to the poe command). See
+[configuration and verification](RESULTS.md#configuration-and-verification).
+
+`generate` writes `manifests/<model>.json` with the run configuration (endpoint
+host, reasoning effort, token cap, temperature, samples, and an optional
+`--label` such as `local Q4_K_M`). `--samples N` draws N answers per question;
+each is judged and the per-question score is their mean. `report` shows each
+model's configuration and warns when compared models differ, adds bootstrap 95%
+CIs, and `report --compare A B` prints a paired per-question comparison. Use
+`report --output PATH` to avoid overwriting an existing `report.md`.
 
 `generate` and `all` accept `--reasoning-effort` values `none`, `minimal`,
 `low`, `medium`, `high`, `xhigh`, and `max`. Omitting the option sends no
